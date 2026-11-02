@@ -15,8 +15,12 @@ def test_upgrade_downgrade_and_reopen(tmp_path: Path, monkeypatch):
     command.upgrade(config, "head")
     engine = create_engine(url)
     with engine.begin() as db:
-        db.execute(text("INSERT INTO limit_buckets (key, value, expires_at) "
-                        "VALUES ('restart-test', 7, '2027-01-01')"))
+        db.execute(
+            text(
+                "INSERT INTO limit_buckets (key, value, expires_at) "
+                "VALUES ('restart-test', 7, '2027-01-01')"
+            )
+        )
     engine.dispose()
     reopened = create_engine(url)
     with reopened.connect() as db:
@@ -26,5 +30,6 @@ def test_upgrade_downgrade_and_reopen(tmp_path: Path, monkeypatch):
     command.upgrade(config, "head")
     engine = create_engine(url)
     assert {"messages", "chat_requests", "anonymous_sessions", "limit_buckets"}.issubset(
-        inspect(engine).get_table_names())
+        inspect(engine).get_table_names()
+    )
     engine.dispose()

@@ -42,11 +42,11 @@ def test_websocket_ownership_and_origin(client):
     create_session_and_conversation(client)
     assert send_chat(client, conversation, "other-session")[0]["code"] == "CONVERSATION_NOT_FOUND"
     assert client.get("/api/v1/conversations").json()["items"][0]["id"] != conversation
-    with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect(
-            "/api/v1/ws/chat", headers={"origin": "https://evil.invalid"}
-        ):
-            pass
+    with (
+        pytest.raises(WebSocketDisconnect),
+        client.websocket_connect("/api/v1/ws/chat", headers={"origin": "https://evil.invalid"}),
+    ):
+        pass
     assert (
         client.post(
             "/api/v1/anonymous-session", headers={"origin": "https://evil.invalid"}

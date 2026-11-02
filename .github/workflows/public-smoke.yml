@@ -1,0 +1,35 @@
+name: Public smoke test
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: Public frontend HTTPS URL
+        required: true
+      api_url:
+        description: Public API HTTPS origin (without /api/v1)
+        required: true
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install uv==0.13.6
+      - run: uv sync --locked
+        working-directory: backend
+      - run: uv run --locked python ../scripts/smoke.py
+        working-directory: backend
+        env:
+          SMOKE_API_URL: ${{ inputs.api_url }}
+          SMOKE_BASE_URL: ${{ inputs.frontend_url }}
+      - run: npm ci && npx playwright install --with-deps chromium && npm test
+        working-directory: frontend
+        env:
+          SMOKE_BASE_URL: ${{ inputs.frontend_url }}

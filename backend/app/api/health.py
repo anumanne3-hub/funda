@@ -14,7 +14,7 @@ async def health() -> dict[str, str]:
 async def ready(request: Request, response: Response) -> dict[str, str]:
     try:
         with request.app.state.session_factory() as db:
-            db.execute(text("SELECT 1"))
+            db.execute(text("SELECT 1 FROM limit_buckets LIMIT 1"))
         return {"status": "ready", "database": "ok"}
     except Exception:
         response.status_code = 503
