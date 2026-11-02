@@ -1,0 +1,411 @@
+PRODUCTION-GRADE GENAI CHATBOT
+Incremental managed-cloud and Kubernetes plan
+
+OBJECTIVE
+
+Build a portfolio-quality GenAI chatbot as a series of usable releases. Begin with React on Vercel, FastAPI on Render, and PostgreSQL plus object storage on Supabase. Keep the API stateless and all durable state external so the application can move to containers and Kubernetes after v1.0.0.
+
+Release rule: do not begin a new milestone until the deployed version passes its tests, smoke checks, security checks, and acceptance criteria.
+
+STACK
+
+- Frontend: React, TypeScript, Vite, React Router, TanStack Query, Tailwind CSS.
+- Backend: Python, FastAPI, Pydantic, SQLAlchemy 2, Alembic, pytest.
+- Data: Supabase PostgreSQL, pgvector from the RAG milestone, Supabase Storage for source files.
+- Authentication: Argon2id password hashing and rotating server-side sessions in Secure HttpOnly cookies.
+- Quality: Ruff, type checking, Vitest, React Testing Library, Playwright, GitHub Actions, dependency and secret scanning.
+- Later: Redis-compatible cache, OCI containers, Kubernetes, metrics, traces, dashboards, and alerts.
+
+RELEASES
+
+- v0.1.0: isolated anonymous chatbot with durable persistence.
+- v0.2.0: authentication, projects, and conversation controls.
+- v0.3.0: document RAG with citations.
+- v0.4.0: bounded short-term conversation context.
+- v0.5.0: long-term user/project memory.
+- v0.6.0: bounded orchestration and answer analysis.
+- v0.7.0: caching, durable jobs, and performance.
+- v1.0.0: hardened and observable portfolio release.
+- v1.1.0: containers and Kubernetes migration.
+
+ENGINEERING RULES
+
+1. Use Alembic for every schema change.
+2. Use UUIDs, UTC timestamps, foreign keys, constraints, explicit indexes, and documented deletion behavior.
+3. Derive identity from the server session. Never trust user_id from a request body.
+4. Keep secrets in backend/deployment settings. Every VITE_ value is public.
+5. Pin dependencies, commit lockfiles, and keep main deployable.
+6. Return consistent safe errors containing code, message, and request_id.
+7. Make retryable writes idempotent so browser retries do not duplicate data or LLM charges.
+8. Persist important operations as pending, completed, or failed.
+9. Apply ownership filters to database queries, files, vector search, background jobs, and caches.
+10. Keep durable state out of Render local disk and process memory.
+11. Version prompts, model configuration, embeddings, parsers, chunking, and cache inputs.
+12. Do not log credentials or unnecessary sensitive prompts.
+13. Delete derived summaries, vectors, files, and caches when their source data is deleted.
+14. Measure quality, latency, reliability, and cost with a fixed evaluation set.
+
+REPOSITORY
+
+genai-chatbot/
+  frontend/src/{app,api,components,features,hooks,routes,types}/
+  frontend/tests/
+  backend/app/{api/v1,core,db,models,repositories,schemas,services,providers,workers}/
+  backend/migrations/
+  backend/tests/{unit,integration,e2e}/
+  docs/{architecture,api-contracts,database-schema,security,deployment,recovery,evaluations}.md
+  infra/{docker,kubernetes}/
+  .github/workflows/ci.yml
+  compose.yaml
+  README.md
+
+MILESTONE 0 — FOUNDATION
+Target: 1–2 sessions
+
+Goal: create a reproducible repository before implementing product features.
+
+Tasks
+- Scaffold React/TypeScript/Vite and FastAPI.
+- Add environment templates, lockfiles, formatting, linting, type checking, tests, and production builds.
+- Add CI, dependency audit, and secret scanning.
+- Define API error, pagination, timestamp, and versioning conventions.
+- Define an LLM provider interface and deterministic mock provider.
+- Add local PostgreSQL with Compose and startup configuration validation.
+- Decide cookie, CSRF, and CORS behavior for Vercel-to-Render requests.
+
+Gate
+- A new developer can run UI, API, PostgreSQL, tests, and builds from the README.
+- CI passes and GET /health returns {"status":"ok"} locally.
+
+MILESTONE 1 — ISOLATED ANONYMOUS CHATBOT
+Target: Week 1, 18–24 hours
+Release: v0.1.0
+
+Goal: a public React UI calls FastAPI, receives an LLM answer, and stores isolated conversation data in PostgreSQL.
+
+Privacy decision
+Create a random anonymous session on the server. Put only its opaque token in a Secure, HttpOnly, SameSite cookie and store a token hash in PostgreSQL. Scope every conversation query to that session. Never expose a shared public conversation list.
+
+Tasks
+- Build an accessible, responsive chat layout and conversation sidebar.
+- Add GET /health for liveness and GET /ready for database readiness.
+- Configure a small database pool, pre-ping, request IDs, structured logs, safe errors, and exact CORS origins.
+- Create migration 0001_initial_chat with anonymous_sessions, conversations, messages, and chat_requests.
+- Add stable message sequence numbers and role/status constraints.
+- Implement anonymous session, conversation create/list/detail, and message submission endpoints.
+- Require Idempotency-Key and enforce uniqueness per conversation.
+- Save the user message and pending request before calling the LLM.
+- Record assistant/request state as pending, completed, or failed.
+- Integrate the mock provider first, then one real provider with timeouts, output-token limits, usage/cost metadata, and safe error mapping.
+- Add empty, loading, error, retry, and disabled-submit states.
+- Add a minimal IP/session rate limit and provider spending cap.
+- Deploy to Vercel, Render, and Supabase; run migrations as one release step.
+- Add an automated public smoke test.
+
+Schema essentials
+- anonymous_sessions: id, token_hash unique, expires_at, created_at.
+- conversations: id, anonymous_session_id FK, title, created_at, updated_at; index by owner and updated_at.
+- messages: id, conversation_id FK, sequence_number, constrained role, content, constrained status, provider_request_id, error_code, token usage, created_at; unique conversation/sequence.
+- chat_requests: id, conversation_id, user_message_id, assistant_message_id, idempotency_key, status, model, prompt_version, duration, timestamps; unique conversation/idempotency key.
+
+Tests and gate
+- Browser/session A cannot list, retrieve, or mutate session B data.
+- Duplicate idempotency keys create one turn and at most one provider operation.
+- Invalid input and provider timeout/rate-limit/failure return controlled errors; the API stays alive.
+- API/database restarts do not erase data.
+- No secret appears in frontend assets or logs.
+- A public visitor can send a message, see an answer, reload, and recover history.
+
+MILESTONE 2 — ACCOUNTS, PROJECTS, AND CONTROLS
+Target: Week 2, 20–26 hours
+Release: v0.2.0
+
+Goal: users have private accounts and can organize and manage their work.
+
+Tasks
+- Add registration, login, logout, refresh, current-user, and logout-all.
+- Use Argon2id, login rate limits, rotating refresh sessions, token hashes, and reuse detection.
+- Use Secure HttpOnly SameSite cookies and CSRF protection.
+- Implement or explicitly defer email verification and password reset.
+- Create projects in this milestone because RAG needs project_id in Milestone 3.
+- Add conversation ownership, project assignment, pagination, rename, and delete.
+- Safely claim or discard anonymous data during account migration.
+- Add message editing, immutable versions/branches, regeneration, and version-linked feedback.
+- Add account deletion and a documented retention/cascade policy.
+- Enforce ownership in repository/database access, not only route handlers.
+
+Gate
+- Raw passwords and session tokens never appear in storage or logs.
+- Expired/revoked/reused sessions and CSRF failures are rejected.
+- User A cannot access any User B resource, including by UUID.
+- Two accounts use the deployed app with no cross-user access.
+
+MILESTONE 3 — DOCUMENT RAG AND CITATIONS
+Target: Week 3, 22–30 hours
+Release: v0.3.0
+
+Goal: users upload project documents, ask grounded questions, and inspect supporting evidence.
+
+Tasks
+- Enable pgvector and fix the embedding model and dimension.
+- Store originals in private Supabase Storage, never Render disk.
+- Validate extension, detected type, size, page count, encryption, and decompression limits.
+- Extract PDF/TXT/Markdown with page and section metadata; treat document text as untrusted.
+- Add database-backed ingestion jobs with attempts, leases, timeouts, and failure reasons.
+- Run ingestion in a separately deployable worker; do not rely on in-process background tasks.
+- Record parser, chunker, and embedding versions; deduplicate by owner/project/content hash.
+- Apply user/project/status filters inside every retrieval query.
+- Add citations to real chunks and display document/page/passage evidence.
+- Delete source files, chunks, jobs, vectors, and caches together.
+- Create a fixed retrieval/citation evaluation set.
+
+Gate
+- Valid files ingest and relevant chunks are retrieved.
+- Malformed and oversized files fail safely.
+- Citations support claims; insufficient evidence produces an honest response.
+- Cross-user/project retrieval is impossible and deletion removes future retrieval.
+- Worker restart safely resumes abandoned jobs.
+
+MILESTONE 4 — SHORT-TERM CONTEXT
+Target: Week 4, 18–24 hours
+Release: v0.4.0
+
+Goal: relevant context survives reloads and restarts without sending the entire transcript every time.
+
+Tasks
+- Build a token-budgeted recent-message window.
+- Persist versioned summaries and structured working state with provenance.
+- Reconstruct context after restart.
+- Prevent concurrent turns from overwriting state with optimistic versioning or locks.
+- Invalidate derived context after edit, branch change, or deletion.
+- Version summary prompts/models and measure quality and token reduction.
+
+Gate
+- Earlier relevant details remain available; recent messages take priority.
+- Summaries do not invent decisions.
+- Edits invalidate affected artifacts and concurrent turns do not corrupt state.
+- Long conversations stay within the configured token budget.
+
+MILESTONE 5 — LONG-TERM MEMORY
+Target: Weeks 5–6, 26–34 hours
+Release: v0.5.0
+
+Goal: useful facts persist across conversations and can be inspected, corrected, and fully forgotten.
+
+Tasks
+- Define categories, scope, retention, expiration, and conservative auto-save rules.
+- Store fact, scope, evidence, confidence, importance, provenance, and prompt/model versions.
+- Support explicit save, correct, and forget instructions.
+- Deduplicate facts and mark conflicts/superseded decisions.
+- Retrieve semantically with strict user/project/status filters.
+- Build memory management UI.
+- Purge deleted facts from summaries, vectors, traces, and caches.
+- Evaluate save -> retrieve -> update -> retrieve -> forget -> verify absence.
+
+Gate
+- Cross-conversation project memory works without cross-user/project leakage.
+- Low-value prompts are not automatically stored.
+- Corrected facts supersede old facts.
+- Deleted/expired facts are absent from every retrieval path and derived artifact.
+
+MILESTONE 6 — BOUNDED ORCHESTRATION
+Target: Week 7, 18–24 hours
+Release: v0.6.0
+
+Goal: an auditable pipeline chooses only the retrieval services needed for a request.
+
+Tasks
+- Define strict Pydantic intents for general, document, project, follow-up, and memory actions.
+- Use deterministic routing for simple cases and structured LLM classification only where needed.
+- Use an allowlisted planner with maximum steps, time, and token budget.
+- Never execute arbitrary model-generated code, SQL, URLs, or tool names.
+- Retrieve recent context, working state, long-term memory, and documents only when appropriate.
+- Deduplicate and rank evidence before generation.
+- Run a bounded evidence/support check after generation.
+- Store sanitized traces containing intent, allowed plan, source versions, outcome, duration, usage, and error code.
+- Version orchestration prompts and configuration.
+
+Gate
+- Simple questions avoid unnecessary retrieval and cost.
+- Document/project/mixed questions use the correct authorized sources.
+- Invalid or excessive plans are rejected.
+- Retrieval failure produces a transparent limitation rather than fabricated facts.
+- Traces explain routing without exposing sensitive payloads.
+
+MILESTONE 7 — CACHE, JOBS, AND PERFORMANCE
+Target: Week 8, 20–28 hours
+Release: v0.7.0
+
+Goal: improve repeated work while preserving correctness and isolation.
+
+Tasks
+- Define cache and job interfaces with feature flags; the app must work when Redis is unavailable.
+- Add Redis-compatible storage with TLS, authentication, TTLs, and size limits.
+- Cache embeddings by normalized text hash and embedding model/version.
+- Cache retrieval by authorization scope, query, corpus version, retrieval configuration, and model versions.
+- Cache full responses only when every answer-changing input is represented in the key.
+- Invalidate on message/branch, document, memory, prompt/model, corpus, and authorization changes.
+- Add bypass, hit/miss/eviction/latency metrics, worker backlog metrics, and outage fallback.
+- Load-test a representative workload and inspect database pool/provider limits.
+
+Gate
+- A defined repeated workload has measurably better latency.
+- Personalized cache data never crosses users.
+- Every relevant mutation prevents stale reuse.
+- Cache outage preserves functional correctness.
+- Worker retries remain idempotent.
+
+MILESTONE 8 — HARDENING AND PORTFOLIO RELEASE
+Target: 24–32 hours
+Release: v1.0.0
+
+Goal: make the managed-hosting system reproducible, observable, recoverable, and safe for a controlled public demonstration.
+
+Tasks
+- Complete per-user budgets, rate limits, request limits, and provider cost caps.
+- Add metrics for traffic, latency, errors, tokens, cost, database pool, cache, and jobs.
+- Add error reporting, dashboards, alerts, and sensitive-data scrubbing.
+- Test migrations from clean and supported prior databases.
+- Rehearse database backup restoration and document recovery.
+- Review sessions, CSRF, CORS, ownership, passwords, storage policies, dependencies, and secrets.
+- Test malicious uploads, document prompt injection, malformed model output, and resource exhaustion.
+- Document privacy, provider data flow, retention, account/memory deletion, and limitations.
+- Run fixed evaluations for chat, RAG, citations, memory, forgetting, authorization, reliability, latency, and cost.
+- Add deployed Playwright smoke tests and complete architecture, API, schema, deployment, and recovery docs.
+
+Gate
+- A new developer reproduces the application from the README.
+- CI, migrations, deployed smoke tests, and restore rehearsal pass.
+- Every cross-user and deleted-data exclusion test passes.
+- No secret is committed, logged, or shipped to the browser.
+- Quality, reliability, latency, and cost baselines are documented.
+
+MILESTONE 9 — CONTAINERS AND KUBERNETES
+Target: after stable v1.0.0, approximately 2–4 weeks
+Release: v1.1.0
+
+Entry rule
+Migrate for a stated learning or operational objective: independent worker scaling, availability, portability, or measured load. Record the reason and success metric before starting.
+
+Container readiness
+- Create multi-stage API and worker Dockerfiles; keep Vercel initially unless moving the frontend has value.
+- Run as non-root, use a read-only filesystem where practical, pin base images, scan images, and generate an SBOM.
+- Validate configuration at startup and handle SIGTERM gracefully.
+- Prove health, readiness, startup, and complete local operation with Compose.
+
+Kubernetes foundation
+- Create namespace, API Deployment/Service, worker Deployment, and optional frontend/Ingress.
+- Add startup, readiness, and liveness probes.
+- Set measured CPU/memory requests and limits.
+- Add rolling updates, PodDisruptionBudget, and topology rules where justified.
+- Add autoscaling only after choosing a measured signal and respecting database/provider ceilings.
+- Use ConfigMaps for non-secret configuration and a managed secret system for credentials.
+- Run Alembic as one pre-release Job; never let every API pod race to migrate.
+- Keep PostgreSQL and object storage managed during the first cluster migration.
+- Add TLS ingress, least-privilege service accounts, network policies, centralized logs, metrics, traces, and alerts.
+
+Cutover
+- Validate everything in a staging cluster.
+- Test pod termination during requests, worker interruption, rolling deployment, cache outage, and database reconnect.
+- Use a canary or low-traffic release first.
+- Maintain application rollback and backward-compatible database changes.
+
+Gate
+- Killing a pod loses no durable data and does not duplicate completed work.
+- Worker jobs resume safely.
+- Rolling deployment keeps the service available.
+- Autoscaling respects downstream capacity.
+- Secrets are absent from manifests, images, logs, and browser bundles.
+- Migration and rollback are rehearsed.
+- Kubernetes meets or improves the v1.0.0 baseline.
+
+ENVIRONMENT TEMPLATE
+
+Backend
+APP_ENV=development
+APP_NAME=genai-chatbot-api
+API_PREFIX=/api/v1
+DATABASE_URL=postgresql+psycopg://...
+MIGRATION_DATABASE_URL=postgresql+psycopg://...
+DATABASE_POOL_SIZE=3
+FRONTEND_ORIGINS=http://localhost:5173
+SESSION_SECRET_KEY=replace-with-random-secret
+CSRF_SECRET_KEY=replace-with-random-secret
+LLM_PROVIDER=mock
+LLM_API_KEY=
+LLM_MODEL=provider-model
+LLM_TIMEOUT_SECONDS=45
+LLM_MAX_OUTPUT_TOKENS=1000
+PROMPT_VERSION=v1
+EMBEDDING_PROVIDER=
+EMBEDDING_API_KEY=
+EMBEDDING_MODEL=
+EMBEDDING_VERSION=
+MAX_MESSAGE_CHARS=12000
+MAX_UPLOAD_MB=10
+MAX_CONTEXT_TOKENS=8000
+SUPABASE_STORAGE_URL=
+SUPABASE_STORAGE_SERVICE_KEY=
+CACHE_ENABLED=false
+REDIS_URL=
+LOG_LEVEL=INFO
+
+Frontend
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+VITE_APP_NAME=GenAI Chatbot
+
+Never place provider keys, service-role keys, database credentials, or session secrets in VITE_ variables.
+
+DEPLOYMENT PIPELINE
+
+Pull request
+1. Backend format, lint, types, tests, and migration validation.
+2. Frontend format, lint, types, tests, and production build.
+3. Dependency, secret, and container scans where applicable.
+4. API contract compatibility and selected browser tests.
+
+Production release
+1. Build immutable artifacts.
+2. Confirm a recovery point for risky schema releases.
+3. Run one migration job.
+4. Deploy API/worker and wait for readiness.
+5. Deploy the frontend with the correct API origin.
+6. Run public smoke tests.
+7. Monitor errors, latency, connections, tokens, and cost.
+8. Roll back application code when smoke checks fail; keep schema changes backward compatible.
+
+QUALITY SCORECARD
+
+- Chat: human-rated quality on a fixed prompt set.
+- Retrieval: Recall@k, precision@k, and latency.
+- Citations: percentage that support the associated claim.
+- Memory precision/recall and explicit forgetting correctness.
+- Authorization: all defined cross-user/project attempts rejected.
+- Reliability: completion, timeout, provider error, and job retry rates.
+- Performance: p50/p95 latency and component contribution.
+- Cost: tokens and estimated provider cost per completed request/user.
+- Operations: deployment, restore, and rollback results.
+
+FIRST SIX WORKING SESSIONS
+
+1. Repository: scaffold UI/API, lock dependencies, add CI/templates/README, mock provider, and /health.
+2. Database: local PostgreSQL, SQLAlchemy/Alembic, 0001_initial_chat, and anonymous sessions.
+3. API: conversations, idempotent chat requests, state transitions, mock answers, and failure tests.
+4. UI: accessible chat, history, loading/error/retry states, and contract tests.
+5. Provider: real adapter, timeouts, usage/cost tracking, limits, and resilience tests.
+6. Deployment: Supabase/Render/Vercel, one migration run, CORS/cookies, and public persistence/isolation smoke tests.
+
+DEFINITION OF DONE FOR EACH MILESTONE
+
+- The feature works through the deployed UI and documented API.
+- Tests cover success, failure, ownership, retry, and deletion paths relevant to the milestone.
+- CI, production builds, migrations, and deployed smoke tests pass.
+- Failures are diagnosable without exposing secrets or unnecessary personal data.
+- Restarts preserve durable state and retries do not duplicate effects.
+- Security/privacy effects and known limitations are documented.
+- README, architecture, API, and schema docs match deployed behavior.
+- The release is tagged and has a viable rollback path.
+
+STARTING DECISION
+
+Implement Milestone 0, then Milestone 1. Keep the mock LLM until persistence, anonymous isolation, idempotency, UI states, and failure handling pass locally. Connect a paid model only after those paths work, then deploy the smallest complete v0.1.0.
