@@ -1,7 +1,8 @@
 from functools import lru_cache
+from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -12,12 +13,47 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "genai-chatbot-api"
     api_prefix: str = "/api/v1"
-    frontend_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    database_url: str = "sqlite:///./genai_chatbot.db"
+    database_pool_size: int = Field(default=3, ge=1, le=20)
+    frontend_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
     log_level: str = "INFO"
-    llm_provider: str = "mock"
+    session_cookie_name: str = "genai_session"
+    session_ttl_days: int = Field(default=30, ge=1, le=365)
+    session_cookie_secure: bool = False
+    session_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    migration_database_url: str | None = None
+    llm_provider: Literal["mock", "openai"] = "mock"
     llm_model: str = "mock-stream-v1"
+    llm_api_key: str | None = None
+    llm_base_url: str = "https://api.openai.com/v1"
     llm_timeout_seconds: int = Field(default=45, ge=1, le=120)
     llm_max_output_tokens: int = Field(default=1000, ge=1, le=8000)
+    llm_input_usd_per_million: float = Field(default=0, ge=0)
+    llm_output_usd_per_million: float = Field(default=0, ge=0)
+    llm_daily_budget_usd: float = Field(default=1, gt=0)
+    requests_per_minute: int = Field(default=20, ge=1)
+    sessions_per_minute: int = Field(default=10, ge=1)
+
+    @model_validator(mode="after")
+    def production_safety(self) -> "Settings":
+        if self.session_cookie_samesite == "none" and not self.session_cookie_secure:
+            raise ValueError("SameSite=None requires secure cookies")
+        if self.llm_provider == "openai":
+            if not self.llm_api_key or self.llm_model == "mock-stream-v1":
+                raise ValueError("A provider key and model are required")
+            if min(self.llm_input_usd_per_million, self.llm_output_usd_per_million) <= 0:
+                raise ValueError("Configure provider prices before enabling paid generation")
+        if self.app_env == "production":
+            if not self.database_url.startswith("postgresql") or not self.session_cookie_secure:
+                raise ValueError("Production requires PostgreSQL and secure cookies")
+            if not self.frontend_origins or any(
+                not origin.startswith("https://") or "*" in origin
+                for origin in self.frontend_origins
+            ):
+                raise ValueError("Production requires exact HTTPS frontend origins")
+        return self
 
     @field_validator("frontend_origins", mode="before")
     @classmethod

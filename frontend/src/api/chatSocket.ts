@@ -6,6 +6,8 @@ export type ServerEvent = {
   content?: string;
   code?: string;
   retryable?: boolean;
+  conversation_id?: string;
+  message_id?: string;
 };
 
 export function websocketUrl(): string {

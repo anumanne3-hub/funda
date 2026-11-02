@@ -1,4 +1,5 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
+from sqlalchemy import text
 
 router = APIRouter(tags=["health"])
 
@@ -10,6 +11,11 @@ async def health() -> dict[str, str]:
 
 
 @router.get("/ready")
-async def ready() -> dict[str, str]:
-    """Database readiness is added with the PostgreSQL implementation step."""
-    return {"status": "ready", "database": "not_configured"}
+async def ready(request: Request, response: Response) -> dict[str, str]:
+    try:
+        with request.app.state.session_factory() as db:
+            db.execute(text("SELECT 1"))
+        return {"status": "ready", "database": "ok"}
+    except Exception:
+        response.status_code = 503
+        return {"status": "not_ready", "database": "unavailable"}

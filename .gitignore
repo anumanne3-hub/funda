@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 .venv/
+.tools/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -12,3 +13,10 @@ dist/
 coverage/
 .DS_Store
 *.log
+.migration-test.db
+*.db
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+playwright-report/
+test-results/
