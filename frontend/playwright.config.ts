@@ -8,10 +8,25 @@ export default defineConfig({
   workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
-  use: { baseURL: external ?? "http://localhost:5173", trace: "retain-on-failure" },
+  use: {
+    baseURL: external ?? "http://localhost:5173",
+    trace: "retain-on-failure",
+  },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: external ? undefined : [
-    { command: "python ../scripts/test_server.py", url: "http://localhost:8000/ready", timeout: 120000, reuseExistingServer: false },
-    { command: "npm run dev -- --host localhost", url: "http://localhost:5173", timeout: 120000, reuseExistingServer: false },
-  ],
+  webServer: external
+    ? undefined
+    : [
+        {
+          command: "python ../scripts/test_server.py",
+          url: "http://localhost:8000/ready",
+          timeout: 120000,
+          reuseExistingServer: false,
+        },
+        {
+          command: "npm run dev -- --host localhost",
+          url: "http://localhost:5173",
+          timeout: 120000,
+          reuseExistingServer: false,
+        },
+      ],
 });

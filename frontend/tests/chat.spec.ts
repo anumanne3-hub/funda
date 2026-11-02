@@ -1,10 +1,17 @@
 import { test, expect } from "@playwright/test";
 
-test("chat survives reload and stays isolated between browser sessions", async ({ page, browser }) => {
+test("chat survives reload and stays isolated between browser sessions", async ({
+  page,
+  browser,
+}) => {
   await page.goto("/");
   await expect(page.getByRole("status")).toHaveText("Connected");
-  await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
-  await page.getByLabel("Message", { exact: true }).fill("Milestone persistence check");
+  await expect(
+    page.getByRole("button", { name: "Send message" }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Message", { exact: true })
+    .fill("Milestone persistence check");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.locator(".message.assistant")).toContainText(/.+/);
   await expect(page.getByLabel("Streaming response")).toHaveCount(0);
@@ -24,13 +31,17 @@ test("chat survives reload and stays isolated between browser sessions", async (
 test("reload during a stream reuses its original request", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("status")).toHaveText("Connected");
-  await page.getByLabel("Message", { exact: true }).fill("Recover this " + "word ".repeat(80));
+  await page
+    .getByLabel("Message", { exact: true })
+    .fill("Recover this " + "word ".repeat(80));
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.locator(".message.assistant")).toHaveCount(1);
   await page.reload();
   await expect(page.getByRole("status")).toHaveText("Connected");
   await expect(page.locator(".message.assistant")).toHaveCount(1);
-  await expect(page.getByLabel("Streaming response")).toHaveCount(0, { timeout: 55000 });
+  await expect(page.getByLabel("Streaming response")).toHaveCount(0, {
+    timeout: 55000,
+  });
   await expect(page.locator(".message.user")).toHaveCount(1);
 });
 

@@ -16,7 +16,8 @@ export type Conversation = {
   messages: ApiMessage[];
 };
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
+const baseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -32,8 +33,12 @@ export async function ensureSession(): Promise<void> {
   await request("/anonymous-session", { method: "POST" });
 }
 
-export async function listConversations(cursor?: string): Promise<{ items: Conversation[]; next_cursor: string | null }> {
-  return request(`/conversations?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+export async function listConversations(
+  cursor?: string,
+): Promise<{ items: Conversation[]; next_cursor: string | null }> {
+  return request(
+    `/conversations?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+  );
 }
 
 export async function createConversation(): Promise<Conversation> {
