@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     session_cookie_secure: bool = False
     session_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     migration_database_url: str | None = None
-    llm_provider: Literal["mock", "openai"] = "mock"
+    llm_provider: Literal["mock", "openai", "gemini"] = "mock"
     llm_model: str = "mock-stream-v1"
     llm_api_key: str | None = None
     llm_base_url: str = "https://api.openai.com/v1"
@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     llm_input_usd_per_million: float = Field(default=0, ge=0)
     llm_output_usd_per_million: float = Field(default=0, ge=0)
     llm_daily_budget_usd: float = Field(default=1, gt=0)
+    llm_free_tier: bool = False
+    llm_daily_request_limit: int = Field(default=100, ge=1, le=10000)
     requests_per_minute: int = Field(default=20, ge=1)
     sessions_per_minute: int = Field(default=10, ge=1)
 
@@ -40,11 +42,20 @@ class Settings(BaseSettings):
     def production_safety(self) -> "Settings":
         if self.session_cookie_samesite == "none" and not self.session_cookie_secure:
             raise ValueError("SameSite=None requires secure cookies")
-        if self.llm_provider == "openai":
+        if self.llm_provider != "mock":
             if not self.llm_api_key or self.llm_model == "mock-stream-v1":
                 raise ValueError("A provider key and model are required")
-            if min(self.llm_input_usd_per_million, self.llm_output_usd_per_million) <= 0:
+            if (
+                not self.llm_free_tier
+                and min(self.llm_input_usd_per_million, self.llm_output_usd_per_million) <= 0
+            ):
                 raise ValueError("Configure provider prices before enabling paid generation")
+            if self.llm_free_tier and (
+                self.llm_provider != "gemini"
+                or self.llm_input_usd_per_million != 0
+                or self.llm_output_usd_per_million != 0
+            ):
+                raise ValueError("Free-tier mode requires Gemini with zero configured prices")
         if self.app_env == "production":
             if not self.database_url.startswith("postgresql") or not self.session_cookie_secure:
                 raise ValueError("Production requires PostgreSQL and secure cookies")

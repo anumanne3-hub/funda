@@ -290,7 +290,27 @@ textarea {
   }
 }
 
+.mobile-conversations {
+  display: none;
+}
 @media (max-width: 720px) {
+  .mobile-conversations {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .mobile-conversations select {
+    max-width: 160px;
+    min-width: 0;
+  }
+  .mobile-conversations button,
+  .mobile-conversations select {
+    padding: 6px;
+    border: 1px solid #dce1ea;
+    border-radius: 6px;
+    background: white;
+    color: #252d3c;
+  }
   .app-shell {
     grid-template-columns: 1fr;
   }

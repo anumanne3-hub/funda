@@ -113,4 +113,71 @@ def get_provider(settings: Settings | None = None) -> LLMProvider:
         return MockProvider()
     if active.llm_provider == "openai":
         return OpenAICompatibleProvider(active)
+    if active.llm_provider == "gemini":
+        return GeminiProvider(active)
     raise RuntimeError(f"Unsupported LLM_PROVIDER: {active.llm_provider}")
+
+
+class GeminiProvider:
+    """Native Gemini SSE adapter, including output/thinking usage. No automatic paid fallback."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.model = settings.llm_model
+        self.api_key = settings.llm_api_key or ""
+        self.timeout = settings.llm_timeout_seconds
+        self.max_tokens = settings.llm_max_output_tokens
+
+    async def stream(self, content: str) -> AsyncIterator[str | Usage]:
+        from urllib.parse import quote
+
+        url = "https://generativelanguage.googleapis.com/v1beta/models/"
+        url += f"{quote(self.model, safe='')}:streamGenerateContent?alt=sse"
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": content}]}],
+            "generationConfig": {"maxOutputTokens": self.max_tokens},
+        }
+        try:
+            async with (
+                httpx.AsyncClient(timeout=self.timeout) as client,
+                client.stream(
+                    "POST", url, headers={"x-goog-api-key": self.api_key}, json=payload
+                ) as response,
+            ):
+                if response.status_code == 429:
+                    raise ProviderError("PROVIDER_RATE_LIMIT", True)
+                if response.status_code >= 500:
+                    raise ProviderError("PROVIDER_UNAVAILABLE", True)
+                if response.status_code >= 400:
+                    raise ProviderError("PROVIDER_REJECTED_REQUEST", False)
+                finished = False
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    data = json.loads(line[5:].strip())
+                    if data.get("error") or data.get("promptFeedback", {}).get("blockReason"):
+                        raise ProviderError("PROVIDER_REJECTED_REQUEST", False)
+                    usage = data.get("usageMetadata")
+                    if usage:
+                        yield Usage(
+                            usage.get("promptTokenCount"),
+                            usage.get("candidatesTokenCount", 0)
+                            + usage.get("thoughtsTokenCount", 0),
+                            data.get("responseId"),
+                        )
+                    for candidate in data.get("candidates", []):
+                        for part in candidate.get("content", {}).get("parts", []):
+                            if part.get("text") and not part.get("thought"):
+                                yield part["text"]
+                        reason = candidate.get("finishReason")
+                        if reason:
+                            if reason not in {"STOP", "MAX_TOKENS"}:
+                                raise ProviderError("PROVIDER_REJECTED_REQUEST", False)
+                            finished = True
+                if not finished:
+                    raise ProviderError("PROVIDER_INCOMPLETE_RESPONSE", False)
+        except httpx.TimeoutException as exc:
+            raise ProviderError("PROVIDER_TIMEOUT", True) from exc
+        except httpx.TransportError as exc:
+            raise ProviderError("PROVIDER_NETWORK_ERROR", True) from exc
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ProviderError("PROVIDER_INVALID_RESPONSE", False) from exc

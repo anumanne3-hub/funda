@@ -36,20 +36,28 @@ export function App() {
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [pageError, setPageError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [canRetry, setCanRetry] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingRef = useRef<Pending | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const bootstrapRef = useRef<Promise<{
+    items: Conversation[];
+    next_cursor: string | null;
+  }> | null>(null);
 
   useEffect(() => {
     let stopped = false;
     void (async () => {
       try {
-        await ensureSession();
-        const page = await listConversations();
-        const items = page.items.length
-          ? page.items
-          : [await createConversation()];
+        bootstrapRef.current ??= (async () => {
+          await ensureSession();
+          const page = await listConversations();
+          if (!page.items.length) page.items = [await createConversation()];
+          return page;
+        })();
+        const page = await bootstrapRef.current;
+        const items = page.items;
         if (stopped) return;
         setConversations(items);
         setNextCursor(page.next_cursor);
@@ -77,6 +85,7 @@ export function App() {
     let assistantId: string | undefined;
     pendingRef.current = readPending(id);
     setBusy(Boolean(pendingRef.current));
+    setCanRetry(false);
     setMessages([]);
     setPageError(null);
     const refresh = async () => {
@@ -100,6 +109,7 @@ export function App() {
       sessionStorage.removeItem(storageKey(id));
       pendingRef.current = null;
       setBusy(false);
+      setCanRetry(false);
     };
     const connect = () => {
       if (stopped) return;
@@ -120,9 +130,13 @@ export function App() {
         }
         if (event.type === "connection.ready") {
           retries = 0;
-          setConnection("open");
           void refresh()
-            .then(resume)
+            .then(() => {
+              if (!stopped) {
+                setConnection("open");
+                resume();
+              }
+            })
             .catch((error: unknown) => {
               if (!stopped) setPageError(String(error));
             });
@@ -170,7 +184,10 @@ export function App() {
           } else {
             setPageError(event.content ?? "Request failed.");
             if (!event.retryable) finish();
-            else setBusy(false);
+            else {
+              setBusy(false);
+              setCanRetry(true);
+            }
             void refresh().catch((error: unknown) => {
               if (!stopped) setPageError(String(error));
             });
@@ -202,16 +219,16 @@ export function App() {
     };
   }, [activeId]);
 
-  useEffect(
-    () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-    [messages],
-  );
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   function retry() {
     if (socketRef.current?.readyState !== WebSocket.OPEN || !pendingRef.current)
       return;
     setPageError(null);
     setBusy(true);
+    setCanRetry(false);
     socketRef.current.send(JSON.stringify(pendingRef.current));
   }
 
@@ -279,7 +296,8 @@ export function App() {
   }
 
   const active = conversations.find((item) => item.id === activeId);
-  const isReady = connection === "open" && Boolean(activeId) && !busy;
+  const isReady =
+    connection === "open" && Boolean(activeId) && !busy && !canRetry;
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Conversations">
@@ -317,6 +335,15 @@ export function App() {
           <div>
             <h1>{active?.title ?? "Starting chat…"}</h1>
             <p>Private anonymous session</p>
+            <div className="mobile-conversations">
+              <select aria-label="Choose conversation" value={activeId ?? ""}
+                onChange={(event) => setActiveId(event.target.value)}>
+                {conversations.map((conversation) => <option key={conversation.id}
+                  value={conversation.id}>{conversation.title}</option>)}
+              </select>
+              <button type="button" onClick={() => void newChat()}>New chat</button>
+              {nextCursor && <button onClick={() => void loadMore()}>More</button>}
+            </div>
           </div>
           <span className={`status ${connection}`} role="status">
             {connection === "open" ? "Connected" : connection}
@@ -327,7 +354,7 @@ export function App() {
             {pageError && (
               <div className="error-banner" role="alert">
                 {pageError}
-                {!busy && (
+                {canRetry && (
                   <button onClick={retry} disabled={connection !== "open"}>
                     Retry
                   </button>

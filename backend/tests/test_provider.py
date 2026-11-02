@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from app.core.config import Settings
-from app.providers.llm import OpenAICompatibleProvider, ProviderError, Usage
+from app.providers.llm import GeminiProvider, OpenAICompatibleProvider, ProviderError, Usage
 
 
 def provider(monkeypatch, handler):
@@ -69,3 +69,34 @@ async def test_malformed_and_truncated_stream(monkeypatch, body, code):
     adapter = provider(monkeypatch, lambda _: httpx.Response(200, text=body))
     with pytest.raises(ProviderError, match=code):
         _ = [event async for event in adapter.stream("hello")]
+
+
+@pytest.mark.asyncio
+async def test_gemini_free_tier_stream_and_usage(monkeypatch):
+    def handler(request):
+        assert request.headers["x-goog-api-key"] == "test-only"
+        assert "key=" not in str(request.url)
+        assert json.loads(request.content)["generationConfig"]["maxOutputTokens"] == 1000
+        data = {
+            "candidates": [
+                {"content": {"parts": [{"text": "Hello Gemini"}]}, "finishReason": "STOP"}
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 3,
+                "candidatesTokenCount": 2,
+                "thoughtsTokenCount": 4,
+            },
+            "responseId": "gemini-request",
+        }
+        return httpx.Response(200, text=f"data: {json.dumps(data)}\n\n")
+
+    provider(monkeypatch, handler)
+    settings = Settings(
+        llm_provider="gemini",
+        llm_model="gemini-3.1-flash-lite",
+        llm_free_tier=True,
+        llm_api_key="test-only",
+        _env_file=None,
+    )
+    events = [event async for event in GeminiProvider(settings).stream("hello")]
+    assert events == [Usage(3, 6, "gemini-request"), "Hello Gemini"]

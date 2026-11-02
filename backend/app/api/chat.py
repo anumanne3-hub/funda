@@ -21,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 async def send_event(websocket: WebSocket, event: ServerEvent) -> None:
-    await websocket.send_json(event.model_dump(mode="json", exclude_none=True))
+    try:
+        await websocket.send_json(event.model_dump(mode="json", exclude_none=True))
+    except (OSError, RuntimeError) as exc:
+        raise WebSocketDisconnect from exc
 
 
 @router.websocket("/ws/chat")
@@ -125,6 +128,19 @@ async def process_chat(websocket: WebSocket, owner_id: UUID, event: ChatSendEven
             ),
         )
         return
+    except Exception:
+        logger.error("chat preparation failed", extra={"event": "chat.prepare.failed"})
+        await send_event(
+            websocket,
+            ServerEvent(
+                type="error",
+                request_id=event.request_id,
+                code="DATABASE_UNAVAILABLE",
+                content="The request could not be saved. Retry with the same request key.",
+                retryable=True,
+            ),
+        )
+        return
 
     await send_event(
         websocket,
@@ -189,6 +205,8 @@ async def process_chat(websocket: WebSocket, owner_id: UUID, event: ChatSendEven
                         )
                     except (WebSocketDisconnect, OSError, RuntimeError):
                         connected = False
+        if not chunks:
+            raise ProviderError("PROVIDER_EMPTY_RESPONSE", False)
         with session_factory() as db:
             complete_chat(db, persisted_request_id, assistant_id, "".join(chunks), started, usage)
         if not connected:
@@ -241,6 +259,6 @@ async def process_chat(websocket: WebSocket, owner_id: UUID, event: ChatSendEven
                 request_id=event.request_id,
                 code="INTERNAL_ERROR",
                 content="The request could not be completed.",
-                retryable=True,
+                retryable=False,
             ),
         )

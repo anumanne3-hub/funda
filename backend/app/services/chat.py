@@ -61,7 +61,9 @@ def prepare_chat(
         assistant = db.get(Message, existing.assistant_message_id)
         if assistant is None:
             raise RuntimeError("Persisted assistant message disappeared")
-        created = existing.created_at.replace(tzinfo=UTC)
+        created = existing.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
         if (
             existing.status == "pending"
             and (datetime.now(UTC) - created).total_seconds()
@@ -77,6 +79,7 @@ def prepare_chat(
     consume(db, f"ip:{ip}", 1, settings.requests_per_minute * 3, 60)
     reservation = 0
     if settings.llm_provider != "mock":
+        consume(db, "provider-requests", 1, settings.llm_daily_request_limit, 86400)
         # UTF-8 bytes bound content tokens; allow extra tokens for the message envelope.
         reservation = math.ceil(
             (len(content.encode("utf-8")) + 256) * settings.llm_input_usd_per_million

@@ -15,6 +15,7 @@ patterns = [
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     re.compile(r"AKIA[A-Z0-9]{16}"),
     re.compile(r"sb_secret_[A-Za-z0-9_-]{20,}"),
+    re.compile(r"AIza[0-9A-Za-z_-]{35}"),
 ]
 if args.assets:
     paths = list((root / args.assets).rglob("*"))
