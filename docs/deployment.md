@@ -155,3 +155,11 @@ uv run --locked python ../scripts/smoke.py
 `Milestone 1 checks` also supports manual runs from GitHub Actions. Enable Actions for the
 repository if needed, then run it on the final release commit. A Vercel deployment check alone
 is not evidence that the backend and frontend CI suites passed.
+
+
+If startup reports a provider settings validation error, check Render's explicit environment
+values. Set `LLM_MODEL=gemini-3.1-flash-lite`; remove an old `mock-stream-v1` override.
+Gemini defaults to this model when `LLM_MODEL` is omitted, but explicit overrides are preserved.
+Set `LLM_PROVIDER=gemini`, a nonblank `LLM_API_KEY`, `LLM_FREE_TIER=true`, and both price
+variables to zero. Settings validation does not authenticate the key with Google.
+Validation errors omit input values so backend credentials are not printed in startup errors.

@@ -100,3 +100,15 @@ Tested deployment at commit `7a35c4c911602691909d422749907aa9bf2edec0`:
 
 These results verify the deployed commit above. Changes to verification workflows and this tracker
 still require hosted CI on their final commit before tagging `v0.1.0`.
+
+
+## Verification branch follow-up
+
+- Hosted push and pull-request CI passed for verification commit
+  `1695136fb8b459f4b33e9658e898c0e0bbf00839`:
+  [push run](https://github.com/anumanne3-hub/funda/actions/runs/41618987140),
+  [PR run](https://github.com/anumanne3-hub/funda/actions/runs/41619016987).
+- Strict live smoke rejected the deployed mock response as intended.
+- Gemini startup configuration now defaults the model when omitted, identifies missing keys
+  separately from stale mock-model overrides, and hides validation input values.
+  The Render startup failure still requires a successful deployment/provider call before closure.
