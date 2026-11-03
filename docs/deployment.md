@@ -13,6 +13,13 @@ records and cost columns without changing existing chat data.
 
 ## Render
 
+With `APP_ENV=production`, code defaults allow `https://funda-geni.vercel.app` and
+`https://funda-phi.vercel.app` and use secure cookies with `SameSite=none`.
+Environment variables override these defaults: remove stale `FRONTEND_ORIGINS` or
+cookie settings from Render to use the code defaults. Local development defaults to
+`http://localhost:5173`, non-secure cookies and `SameSite=lax`; keep
+`APP_ENV=development` in the local `.env`. Do not copy the local `.env` to Render.
+
 The repository's `render.yaml` defines the API, locked install, `/ready` health check and one
 pre-deploy migration command. The template uses a Starter service for the pre-deploy step.
 For an existing Free service, run the migration separately once before deploying; do not

@@ -38,6 +38,19 @@ class Settings(BaseSettings):
     requests_per_minute: int = Field(default=20, ge=1)
     sessions_per_minute: int = Field(default=10, ge=1)
 
+    @model_validator(mode="before")
+    @classmethod
+    def environment_defaults(cls, values: object) -> object:
+        if isinstance(values, dict) and values.get("app_env") == "production":
+            values = dict(values)
+            values.setdefault(
+                "frontend_origins",
+                ["https://funda-geni.vercel.app", "https://funda-phi.vercel.app"],
+            )
+            values.setdefault("session_cookie_secure", True)
+            values.setdefault("session_cookie_samesite", "none")
+        return values
+
     @model_validator(mode="after")
     def production_safety(self) -> "Settings":
         if self.session_cookie_samesite == "none" and not self.session_cookie_secure:
