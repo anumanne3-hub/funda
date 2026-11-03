@@ -9,6 +9,7 @@ from websockets.sync.client import connect
 
 base = os.environ["SMOKE_API_URL"].rstrip("/")
 origin = os.environ["SMOKE_BASE_URL"].rstrip("/")
+require_real_provider = os.environ.get("SMOKE_REQUIRE_REAL_PROVIDER", "false").lower() == "true"
 headers = {"Origin": origin}
 with httpx.Client(base_url=base, headers=headers, timeout=60) as client:
     assert client.get("/health").json()["status"] == "ok"
@@ -32,7 +33,12 @@ with httpx.Client(base_url=base, headers=headers, timeout=60) as client:
                 if result["type"] in {"message.completed", "error"}:
                     assert result["type"] == "message.completed", result.get("code")
                     break
-    assert len(client.get(f"/api/v1/conversations/{conversation}").json()["messages"]) == 2
+    messages = client.get(f"/api/v1/conversations/{conversation}").json()["messages"]
+    assert len(messages) == 2
+    if require_real_provider:
+        assert not messages[-1]["content"].startswith("Mock assistant:"), (
+            "Release verification requires a real provider; the deployment still uses mock"
+        )
     with httpx.Client(base_url=base, headers=headers) as other:
         other.post("/api/v1/anonymous-session").raise_for_status()
         assert other.get(f"/api/v1/conversations/{conversation}").status_code == 404

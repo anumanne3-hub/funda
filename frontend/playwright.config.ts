@@ -8,6 +8,7 @@ const backendPython =
 export default defineConfig({
   testDir: "./tests",
   timeout: 60000,
+  expect: { timeout: external ? 30000 : 5000 },
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
