@@ -15,20 +15,21 @@ verification pending; `[ ]` not completed. Do not equate a deployment template w
 10. [x] Conversation create/list/detail with composite cursor ordering and frontend load-more controls.
 11. [x] Transactional message/request states and persisted streamed results.
 12. [x] Idempotency keys, payload-conflict checks and concurrent duplicate-request locking.
-13. [~] Mock, OpenAI-compatible and native Gemini adapters. Mock transport contract tests pass;
-    deployed API still returns mock output as of the verification below; live Gemini verification pending.
+13. [x] Mock, OpenAI-compatible and native Gemini adapters. Transport contract tests pass;
+    user reports Gemini configured and strict live smoke now passes with non-mock output.
 14. [x] Provider total timeout/output limit, usage/cost metadata, durable IP/session limits,
     daily request caps, conservative paid budget reservations and no automatic duplicate provider calls.
 15. [x] Persisted UI history, original-key retry/reconnect, reload reconciliation and stale-request handling.
 16. [x] Backend tests for migrations, ownership, invalid input, provider errors, rate/budget limits,
     idempotency and concurrency. Browser tests cover isolation, reload, interrupted streaming and mobile UI.
-17. [~] CI and public smoke workflows implemented; local checks pass. Hosted GitHub Actions result
-    passed for the deployed commit; strict hosted public smoke with a real provider remains pending.
+17. [x] Hosted CI and dedicated GitHub Actions public smoke passed on release commit
+    cf5f0651817cede8e929d4cec9bd028909149b2f, including real-provider and live browser checks.
 18. [x] Supabase/Render/Vercel deployment is live. Public API health/readiness and browser
     session creation work; Render database connection and CORS issues were resolved.
-19. [~] Local API/database restart checks and public API/browser smoke pass, including production
-    cookies, isolation, reload and stream recovery. Hosted API restart verification remains pending.
-20. [ ] Tag v0.1.0 only after all hosted acceptance criteria pass.
+19. [x] Local API/database restart checks and public API/browser smoke pass, including production
+    cookies, isolation, reload and stream recovery. User confirmed conversations and messages
+    remain unchanged after a Render service restart.
+20. [x] Published v0.1.0 on cf5f0651817cede8e929d4cec9bd028909149b2f after CI and public smoke passed.
 
 ## Recorded local verification
 
@@ -43,15 +44,16 @@ verification pending; `[ ]` not completed. Do not equate a deployment template w
 - Source and built-asset secret-pattern scans passed. This is a targeted pattern scan, not a proof
   that arbitrary secrets cannot exist; hosted environment and log checks remain part of release.
 
-## External release inputs still needed
+## Release status
 
-- Configure a valid Gemini API key and `LLM_PROVIDER=gemini` in Render, then redeploy.
-  The committed Blueprint selects Gemini, but the deployed service currently returns mock output.
-  Keep secrets in Render; do not commit them or paste them into chat.
-- Install/connect the Render integration to permit service inspection and a controlled API restart.
-- Run hosted CI on the final verification changes and the strict public smoke workflow after
-  real-provider setup. CI already passed for the currently deployed commit.
-- Verify history after the hosted API restart, then create the release tag once all gates pass.
+Milestone 1 is complete. Tag `v0.1.0` points to the verified release commit
+`cf5f0651817cede8e929d4cec9bd028909149b2f`.
+
+- [Hosted CI passed](https://github.com/anumanne3-hub/funda/actions/runs/41619743266).
+- [Dedicated public smoke passed](https://github.com/anumanne3-hub/funda/actions/runs/41622856935).
+- [Release tag](https://github.com/anumanne3-hub/funda/releases/tag/v0.1.0).
+- Hosted restart persistence was confirmed by the user; earlier pending-status notes
+  below are historical and superseded by these results.
 
 ## Acceptance gate
 
@@ -112,3 +114,36 @@ still require hosted CI on their final commit before tagging `v0.1.0`.
 - Gemini startup configuration now defaults the model when omitted, identifies missing keys
   separately from stale mock-model overrides, and hides validation input values.
   The Render startup failure still requires a successful deployment/provider call before closure.
+
+
+## Real-provider live verification ? 2026-11-03
+
+- Strict public API smoke passed with `SMOKE_REQUIRE_REAL_PROVIDER=true` against the production
+  frontend/API origins: health, write readiness, real streamed reply, replay without duplicate
+  messages, persisted history and isolation of a second session.
+- This supersedes the earlier mock-provider result. The user reports Gemini is configured;
+  the live check confirms a successful non-mock reply without inspecting or exposing secrets.
+- Hosted push and PR CI also passed for settings-fix commit
+  `37e819195c217992850cbecd0f5caaf7adfcfbe5` (runs 41619432101 and 41619437735).
+- Hosted restart remains pending: the Render integration is not installed/connected.
+  No production restart, schema change, reset or release tag was performed.
+
+
+## Hosted restart confirmation - 2026-11-03
+
+- User restarted the Render service and confirmed existing conversations and messages
+  remained unchanged. This closes the hosted API restart persistence check.
+- This is user-reported verification; the assistant did not perform the restart or compare
+  its private checkpoint after the restart. No database restart or reset is claimed.
+- Earlier pending-restart and provider-setup notes above describe historical status and
+  are superseded by the real-provider smoke result and this confirmation.
+
+
+## Final release verification - 2026-11-03
+
+- Ran the dedicated GitHub Actions public-smoke workflow on release commit `cf5f065`.
+  Strict real-provider API checks and all live browser tests passed (run 41622856935).
+- Confirmed hosted CI passed on the same commit (run 41619743266).
+- Created and read back remote tag `v0.1.0`, pointing to the verified commit.
+- No service restart, application deployment, schema change or database reset was performed
+  during this final release step. The workflow created isolated test sessions/conversations.
