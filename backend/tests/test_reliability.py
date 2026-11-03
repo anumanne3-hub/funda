@@ -176,3 +176,34 @@ def test_errors_do_not_echo_inputs(client):
     assert response.status_code == 422
     assert "private-value" not in response.text
     assert response.json()["request_id"] == response.headers["X-Request-ID"]
+
+
+def test_cors_preflight_and_session_response(client):
+    origin = get_settings().frontend_origins[0]
+    preflight = client.options(
+        "/api/v1/anonymous-session",
+        headers={
+            "origin": origin,
+            "access-control-request-method": "POST",
+            "access-control-request-headers": "content-type",
+        },
+    )
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == origin
+    response = client.post("/api/v1/anonymous-session", headers={"origin": origin})
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert response.headers["access-control-allow-credentials"] == "true"
+
+
+def test_cors_headers_on_middleware_error(client, monkeypatch):
+    def unavailable_db():
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(app.state, "session_factory", unavailable_db)
+    origin = get_settings().frontend_origins[0]
+    response = client.post("/api/v1/anonymous-session", headers={"origin": origin})
+    assert response.status_code == 500
+    assert response.json()["code"] == "INTERNAL_ERROR"
+    assert response.headers["access-control-allow-origin"] == origin
+    assert response.headers["access-control-allow-credentials"] == "true"

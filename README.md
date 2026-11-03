@@ -86,14 +86,69 @@ That script starts a mock API on port 18080, persists a chat, restarts the API a
 history and idempotent replay. `RESTART_WORKSPACE_POSTGRES=1` additionally restarts only the
 portable database at `.tools/pgdata`; it is for this Windows workspace, not a shared hosted DB.
 
+## Supabase production migrations
+
+PostgreSQL schema changes are versioned SQL files in `supabase/migrations/`.
+The Supabase project configuration is `supabase/config.toml`; Alembic is no longer used.
+
+In the Supabase GitHub integration, select the repository and production branch and set
+the project working directory to the **repository root**, containing `supabase/`.
+Enable production migration deployment and inspect the deployment logs after pushing.
+Do not point the integration at `backend` or the old `backend/supabase` folder.
+
+If application tables already exist remotely, follow the existing-database instructions
+in [the deployment guide](docs/deployment.md#existing-databases-previously-migrated-with-alembic)
+before applying these initial SQL migrations. Do not reset the production database.
+
+For a manual deployment from the repository root, Supabase CLI 3 uses:
+
+```powershell
+npx supabase@3.0.0 db push --remote=$env:MIGRATION_DATABASE_URL
+```
+
+Set that shell variable privately to the Supabase session-pooler URI, beginning with
+`postgresql://` and using `sslmode=require`. The CLI does not automatically load
+`backend/.env`. Never commit the password or put it in frontend configuration.
+
 ## Render commands
 
 Root Directory: `backend`
+
+Build and start commands are unchanged. Supabase now deploys migrations separately;
+remove any old Alembic command from the existing Render service's Pre-Deploy field.
 
 - Build: `pip install uv==0.13.6 && uv sync --locked`
 - Start: `uv run --locked uvicorn app.main:app --host 0.0.0.0 --port $PORT --ws-max-size 65536`
 - Pre-deploy: leave blank; Supabase deploys SQL migrations separately before the API rollout.
 - Health check: `/ready`
+
+Configure these values in Render's Environment settings:
+
+| Key | Value |
+| --- | --- |
+| `APP_ENV` | `production` |
+| `DATABASE_URL` | Supabase session-pooler URI with `postgresql+psycopg://` and `sslmode=require` |
+| `FRONTEND_ORIGINS` | `https://funda-geni.vercel.app` |
+| `SESSION_COOKIE_SECURE` | `true` |
+| `SESSION_COOKIE_SAMESITE` | `none` |
+| `LLM_PROVIDER` | `mock` until real-provider settings are configured |
+
+The API only needs `DATABASE_URL`; `MIGRATION_DATABASE_URL` is for the shell running the
+Supabase CLI. Local `backend/.env` settings do not configure Render.
+
+Apply database migrations before rolling out the API. Check `/health` for process liveness
+and `/ready` for database/schema readiness. Both should return HTTP 200.
+
+## Vercel configuration
+
+Use Root Directory `frontend` and set this public build-time variable, then redeploy:
+
+```dotenv
+VITE_API_BASE_URL=https://funda-g0wg.onrender.com/api/v1
+```
+
+The current frontend origin is `https://funda-geni.vercel.app`. If it changes, update
+Render's `FRONTEND_ORIGINS` to the exact new origin without a trailing slash.
 
 See the deployment guide for Supabase GitHub migration setup, database connections, production
 cookies/CORS, Vercel configuration and the automated public smoke workflow. Release `v0.1.0`

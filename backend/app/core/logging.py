@@ -1,5 +1,6 @@
 import json
 import logging
+import traceback
 from datetime import UTC, datetime
 
 
@@ -16,6 +17,17 @@ class JsonFormatter(logging.Formatter):
         for key in ("request_id", "event", "conversation_id"):
             if value := getattr(record, key, None):
                 payload[key] = value
+        if record.exc_info and record.exc_info[1] is not None:
+            error = record.exc_info[1]
+            payload["error_type"] = type(error).__name__
+            # Exception messages can contain SQL parameters, credentials, or user text.
+            payload["traceback"] = [
+                {"file": frame.filename, "line": frame.lineno, "function": frame.name}
+                for frame in traceback.extract_tb(record.exc_info[2])
+            ]
+            original = getattr(error, "orig", error)
+            if sqlstate := getattr(original, "sqlstate", None):
+                payload["sqlstate"] = sqlstate
         return json.dumps(payload, ensure_ascii=False)
 
 

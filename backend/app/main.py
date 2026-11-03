@@ -34,13 +34,6 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 app.state.session_factory = SessionLocal
 app.state.llm_provider = get_provider(settings)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.frontend_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Idempotency-Key", "X-Request-ID"],
-)
 app.include_router(health_router)
 app.include_router(chat_router, prefix=settings.api_prefix)
 app.include_router(conversations_router, prefix=settings.api_prefix)
@@ -82,7 +75,7 @@ async def request_context(request: Request, call_next):
             headers={"Retry-After": "60"},
         )
     except Exception:
-        logger.error(
+        logger.exception(
             "request failed", extra={"event": "http.request.failed", "request_id": request_id}
         )
         response = JSONResponse(
@@ -104,6 +97,15 @@ async def request_context(request: Request, call_next):
     response.headers["Server-Timing"] = f"app;dur={(time.perf_counter() - started) * 1000:.1f}"
     return response
 
+
+# Register last so CORS also covers responses created by request_context.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.frontend_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Idempotency-Key", "X-Request-ID"],
+)
 
 @app.exception_handler(HTTPException)
 async def http_error(request: Request, exc: HTTPException):
