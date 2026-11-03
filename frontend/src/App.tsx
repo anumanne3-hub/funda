@@ -1,12 +1,37 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
+  activateMessageVersion,
+  assignProject,
+  authenticate,
+  claimAnonymous,
   createConversation,
+  createProject,
+  currentAccount,
+  deleteAccount,
+  deleteProject,
+  deleteConversation,
+  discardAnonymous,
+  editMessage,
   ensureSession,
   getConversation,
   listConversations,
+  listProjects,
+  listMessageVersions,
+  logout,
+  logoutAll,
+  renameConversation,
+  renameProject,
+  regenerateMessage,
+  sendMessageFeedback,
 } from "./api/client";
-import type { ApiMessage, Conversation } from "./api/client";
+import type {
+  Account,
+  ApiMessage,
+  Conversation,
+  MessageVersion,
+  Project,
+} from "./api/client";
 import { websocketUrl } from "./api/chatSocket";
 import type { ConnectionState, ServerEvent } from "./api/chatSocket";
 
@@ -30,11 +55,24 @@ function readPending(id: string): Pending | null {
 
 export function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [messageVersions, setMessageVersions] = useState<
+    Record<string, MessageVersion[]>
+  >({});
+  const [regenerationRetryId, setRegenerationRetryId] = useState<string | null>(
+    null,
+  );
+  const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [selectedProject, setSelectedProject] = useState<string>("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [pageError, setPageError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [canRetry, setCanRetry] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -52,6 +90,11 @@ export function App() {
       try {
         bootstrapRef.current ??= (async () => {
           await ensureSession();
+          const signedIn = await currentAccount();
+          if (signedIn) {
+            setAccount(signedIn);
+            setProjects(await listProjects());
+          }
           const page = await listConversations();
           if (!page.items.length) page.items = [await createConversation()];
           return page;
@@ -74,6 +117,260 @@ export function App() {
     };
   }, []);
 
+  async function reloadConversations(projectId = selectedProject) {
+    socketRef.current?.close();
+    setConnection("connecting");
+    const page = await listConversations(undefined, projectId || undefined);
+    if (!page.items.length)
+      page.items = [await createConversation(projectId || null)];
+    setConversations(page.items);
+    setNextCursor(page.next_cursor);
+    setActiveId(page.items[0].id);
+  }
+
+  async function filterProject(projectId: string) {
+    socketRef.current?.close();
+    setConnection("connecting");
+    setSelectedProject(projectId);
+    try {
+      const page = await listConversations(undefined, projectId || undefined);
+      setConversations(page.items);
+      setNextCursor(page.next_cursor);
+      setActiveId(page.items[0]?.id ?? null);
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function submitAuth(event: FormEvent) {
+    event.preventDefault();
+    if (!authMode) return;
+    socketRef.current?.close();
+    setConnection("connecting");
+    try {
+      const signedIn = await authenticate(authMode, email, password);
+      if (signedIn) window.location.reload();
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleClaim() {
+    try {
+      await claimAnonymous();
+      window.location.reload();
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleDiscard() {
+    if (!window.confirm("Delete all anonymous conversations on this browser?"))
+      return;
+    try {
+      await discardAnonymous();
+      window.location.reload();
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await logout();
+      window.location.reload();
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleLogoutAll() {
+    try {
+      await logoutAll();
+      window.location.reload();
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (
+      !window.confirm(
+        "Delete your account, projects, chats, messages, versions and feedback?",
+      )
+    )
+      return;
+    try {
+      await deleteAccount();
+      window.location.reload();
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleCreateProject() {
+    const name = window.prompt("Project name");
+    if (!name?.trim()) return;
+    try {
+      const project = await createProject(name.trim());
+      setProjects((items) => [...items, project]);
+      await filterProject(project.id);
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleRenameProject() {
+    const project = projects.find((item) => item.id === selectedProject);
+    if (!project) return;
+    const name = window.prompt("Project name", project.name);
+    if (!name?.trim()) return;
+    try {
+      const updated = await renameProject(project.id, name.trim());
+      setProjects((items) =>
+        items.map((item) => (item.id === project.id ? updated : item)),
+      );
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleDeleteProject() {
+    if (
+      !selectedProject ||
+      !window.confirm(
+        "Delete this project? Its conversations will become unassigned.",
+      )
+    )
+      return;
+    try {
+      await deleteProject(selectedProject);
+      setProjects((items) =>
+        items.filter((item) => item.id !== selectedProject),
+      );
+      setSelectedProject("");
+      await reloadConversations("");
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleRename() {
+    if (!activeId) return;
+    const title = window.prompt("Conversation title", active?.title ?? "");
+    if (!title?.trim()) return;
+    try {
+      const updated = await renameConversation(activeId, title.trim());
+      setConversations((items) =>
+        items.map((item) => (item.id === activeId ? updated : item)),
+      );
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleDelete() {
+    if (
+      !activeId ||
+      !window.confirm("Delete this conversation and its messages?")
+    )
+      return;
+    try {
+      await deleteConversation(activeId);
+      await reloadConversations();
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleAssignment(projectId: string) {
+    if (!activeId) return;
+    try {
+      const updated = await assignProject(activeId, projectId || null);
+      if (selectedProject && updated.project_id !== selectedProject) {
+        await filterProject(selectedProject);
+      } else {
+        setConversations((items) =>
+          items.map((item) => (item.id === activeId ? updated : item)),
+        );
+      }
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function handleEdit(message: ApiMessage) {
+    const content = window.prompt("Edit your message", message.content);
+    if (!content?.trim() || !activeId) return;
+    try {
+      await editMessage(message.id, content.trim());
+      setMessages((await getConversation(activeId)).messages);
+      setNotice(
+        "The earlier answer used the previous prompt. Regenerate it if you want a new answer.",
+      );
+      setMessageVersions((current) => ({ ...current, [message.id]: [] }));
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function showVersions(message: ApiMessage) {
+    try {
+      const rows = await listMessageVersions(message.id);
+      setMessageVersions((current) => ({ ...current, [message.id]: rows }));
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function restoreVersion(message: ApiMessage, versionId: string) {
+    if (!activeId) return;
+    try {
+      await activateMessageVersion(message.id, versionId);
+      setMessages((await getConversation(activeId)).messages);
+      setNotice(
+        "The earlier answer may use another prompt version. Regenerate it if needed.",
+      );
+      setMessageVersions((current) => ({ ...current, [message.id]: [] }));
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function giveFeedback(message: ApiMessage, rating: -1 | 1) {
+    try {
+      const rows = await listMessageVersions(message.id);
+      await sendMessageFeedback(message.id, rows[rows.length - 1].id, rating);
+    } catch (error) {
+      setPageError(String(error));
+    }
+  }
+
+  async function regenerate(message: ApiMessage) {
+    if (!activeId) return;
+    const keyName = `regen:${message.id}`;
+    const key = sessionStorage.getItem(keyName) ?? crypto.randomUUID();
+    sessionStorage.setItem(keyName, key);
+    setBusy(true);
+    try {
+      await regenerateMessage(message.id, key);
+      sessionStorage.removeItem(keyName);
+      setRegenerationRetryId(null);
+      setNotice(null);
+      setMessages((await getConversation(activeId)).messages);
+    } catch (error) {
+      setRegenerationRetryId(message.id);
+      setPageError(String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startNewRegeneration(message: ApiMessage) {
+    sessionStorage.removeItem(`regen:${message.id}`);
+    void regenerate(message);
+  }
+
   useEffect(() => {
     if (!activeId) return;
     const id = activeId;
@@ -88,6 +385,7 @@ export function App() {
     setCanRetry(false);
     setMessages([]);
     setPageError(null);
+    setNotice(null);
     const refresh = async () => {
       const conversation = await getConversation(id);
       if (stopped) return;
@@ -240,7 +538,8 @@ export function App() {
       !activeId ||
       busy ||
       pendingRef.current ||
-      connection !== "open"
+      connection !== "open" ||
+      socketRef.current?.readyState !== WebSocket.OPEN
     )
       return;
     const requestId = crypto.randomUUID();
@@ -271,7 +570,9 @@ export function App() {
 
   async function newChat() {
     try {
-      const conversation = await createConversation();
+      socketRef.current?.close();
+      setConnection("connecting");
+      const conversation = await createConversation(selectedProject || null);
       setConversations((items) => [conversation, ...items]);
       setActiveId(conversation.id);
     } catch (error) {
@@ -282,7 +583,10 @@ export function App() {
   async function loadMore() {
     if (!nextCursor) return;
     try {
-      const page = await listConversations(nextCursor);
+      const page = await listConversations(
+        nextCursor,
+        selectedProject || undefined,
+      );
       setConversations((items) => [
         ...items,
         ...page.items.filter(
@@ -297,7 +601,11 @@ export function App() {
 
   const active = conversations.find((item) => item.id === activeId);
   const isReady =
-    connection === "open" && Boolean(activeId) && !busy && !canRetry;
+    connection === "open" &&
+    socketRef.current?.readyState === WebSocket.OPEN &&
+    Boolean(activeId) &&
+    !busy &&
+    !canRetry;
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Conversations">
@@ -305,6 +613,104 @@ export function App() {
           <span className="brand-mark">G</span>
           <span>GenAI Chat</span>
         </div>
+        <div className="account-controls">
+          {account ? (
+            <>
+              <span>{account.email}</span>
+              <button type="button" onClick={() => void handleClaim()}>
+                Claim anonymous chats
+              </button>
+              <button type="button" onClick={() => void handleDiscard()}>
+                Discard anonymous chats
+              </button>
+              <button type="button" onClick={() => void handleLogout()}>
+                Log out
+              </button>
+              <button type="button" onClick={() => void handleLogoutAll()}>
+                Log out everywhere
+              </button>
+              <button type="button" onClick={() => void handleDeleteAccount()}>
+                Delete account
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => setAuthMode("login")}>
+                Log in
+              </button>
+              <button type="button" onClick={() => setAuthMode("register")}>
+                Create account
+              </button>
+            </>
+          )}
+        </div>
+        {authMode && (
+          <form
+            className="auth-form"
+            onSubmit={(event) => void submitAuth(event)}
+          >
+            <h2>{authMode === "login" ? "Log in" : "Create account"}</h2>
+            <label>
+              Email
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                required
+                minLength={12}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <button type="submit">Continue</button>
+            <button type="button" onClick={() => setAuthMode(null)}>
+              Cancel
+            </button>
+          </form>
+        )}
+        {account && (
+          <div className="project-controls">
+            <label htmlFor="project-filter">Project</label>
+            <select
+              id="project-filter"
+              value={selectedProject}
+              onChange={(event) => void filterProject(event.target.value)}
+            >
+              <option value="">All projects</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => void handleCreateProject()}>
+              + New project
+            </button>
+            {selectedProject && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleRenameProject()}
+                >
+                  Rename project
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteProject()}
+                >
+                  Delete project
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <button
           className="new-chat"
           type="button"
@@ -328,13 +734,51 @@ export function App() {
             Load more conversations
           </button>
         )}
-        <div className="sidebar-footer">Private anonymous chat</div>
+        <div className="sidebar-footer">
+          {account ? "Private account chat" : "Private anonymous chat"}
+        </div>
       </aside>
       <section className="chat-panel">
         <header className="chat-header">
           <div>
             <h1>{active?.title ?? "Starting chat…"}</h1>
-            <p>Private anonymous session</p>
+            <p>
+              {account
+                ? "Private account session"
+                : "Private anonymous session"}
+            </p>
+            <div className="conversation-actions">
+              <button
+                type="button"
+                onClick={() => void handleRename()}
+                disabled={!activeId}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={!activeId}
+              >
+                Delete
+              </button>
+              {account && (
+                <select
+                  aria-label="Assign project"
+                  value={active?.project_id ?? ""}
+                  onChange={(event) =>
+                    void handleAssignment(event.target.value)
+                  }
+                >
+                  <option value="">No project</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="mobile-conversations">
               <select
                 aria-label="Choose conversation"
@@ -361,6 +805,7 @@ export function App() {
         </header>
         <div className="messages" aria-live="polite">
           <div className="message-list">
+            {notice && <p className="chat-notice">{notice}</p>}
             {pageError && (
               <div className="error-banner" role="alert">
                 {pageError}
@@ -395,6 +840,70 @@ export function App() {
                   </p>
                   {message.status === "pending" && (
                     <span className="typing" aria-label="Streaming response" />
+                  )}
+                  {account && message.status === "completed" && (
+                    <div className="message-actions">
+                      {message.role === "user" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void handleEdit(message)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void showVersions(message)}
+                          >
+                            Versions
+                          </button>
+                          {messageVersions[message.id]?.map((version) => (
+                            <button
+                              key={version.id}
+                              type="button"
+                              onClick={() =>
+                                void restoreVersion(message, version.id)
+                              }
+                            >
+                              Restore v{version.version_number}
+                            </button>
+                          ))}
+                        </>
+                      ) : message.role === "assistant" ? (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Helpful answer"
+                            onClick={() => void giveFeedback(message, 1)}
+                          >
+                            Helpful
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Unhelpful answer"
+                            onClick={() => void giveFeedback(message, -1)}
+                          >
+                            Unhelpful
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void regenerate(message)}
+                          >
+                            Regenerate
+                          </button>
+                          {regenerationRetryId === message.id && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => startNewRegeneration(message)}
+                            >
+                              Start new regeneration
+                            </button>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </article>

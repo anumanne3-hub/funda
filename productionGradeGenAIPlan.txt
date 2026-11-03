@@ -10,8 +10,8 @@ Release rule: do not begin a new milestone until the deployed version passes its
 STACK
 
 - Frontend: React, TypeScript, Vite, React Router, TanStack Query, Tailwind CSS.
-- Backend: Python, FastAPI, Pydantic, SQLAlchemy 2, Alembic, pytest.
-- Data: Supabase PostgreSQL, pgvector from the RAG milestone, Supabase Storage for source files.
+- Backend: Python, FastAPI, Pydantic, SQLAlchemy 2, Supabase SQL migrations, pytest.
+- Data: Supabase PostgreSQL for application data and, from the RAG milestone, pgvector embeddings and chunk metadata; private Supabase Storage for original source files.
 - Authentication: Argon2id password hashing and rotating server-side sessions in Secure HttpOnly cookies.
 - Quality: Ruff, type checking, Vitest, React Testing Library, Playwright, GitHub Actions, dependency and secret scanning.
 - Later: Redis-compatible cache, OCI containers, Kubernetes, metrics, traces, dashboards, and alerts.
@@ -30,7 +30,7 @@ RELEASES
 
 ENGINEERING RULES
 
-1. Use Alembic for every schema change.
+1. Use versioned SQL migrations in repository-root supabase/migrations/ for every schema change. Apply them once before deploying dependent API code.
 2. Use UUIDs, UTC timestamps, foreign keys, constraints, explicit indexes, and documented deletion behavior.
 3. Derive identity from the server session. Never trust user_id from a request body.
 4. Keep secrets in backend/deployment settings. Every VITE_ value is public.
@@ -148,7 +148,8 @@ Goal: users upload project documents, ask grounded questions, and inspect suppor
 
 Tasks
 - Enable pgvector and fix the embedding model and dimension.
-- Store originals in private Supabase Storage, never Render disk.
+- Store document records, chunks, metadata, and embedding vectors in the existing Supabase PostgreSQL database, scoped by owner and project. Use pgvector for similarity search.
+- Store originals in private Supabase Storage, never Render disk. Keep storage object references in PostgreSQL.
 - Validate extension, detected type, size, page count, encryption, and decompression limits.
 - Extract PDF/TXT/Markdown with page and section metadata; treat document text as untrusted.
 - Add database-backed ingestion jobs with attempts, leases, timeouts, and failure reasons.
@@ -300,7 +301,7 @@ Kubernetes foundation
 - Add rolling updates, PodDisruptionBudget, and topology rules where justified.
 - Add autoscaling only after choosing a measured signal and respecting database/provider ceilings.
 - Use ConfigMaps for non-secret configuration and a managed secret system for credentials.
-- Run Alembic as one pre-release Job; never let every API pod race to migrate.
+- Apply Supabase SQL migrations once before the release; never let every API pod race to migrate.
 - Keep PostgreSQL and object storage managed during the first cluster migration.
 - Add TLS ingress, least-privilege service accounts, network policies, centralized logs, metrics, traces, and alerts.
 
@@ -389,7 +390,7 @@ QUALITY SCORECARD
 FIRST SIX WORKING SESSIONS
 
 1. Repository: scaffold UI/API, lock dependencies, add CI/templates/README, mock provider, and /health.
-2. Database: local PostgreSQL, SQLAlchemy/Alembic, 0001_initial_chat, and anonymous sessions.
+2. Database: local PostgreSQL, SQLAlchemy, versioned Supabase SQL migrations, and anonymous sessions.
 3. API: conversations, idempotent chat requests, state transitions, mock answers, and failure tests.
 4. UI: accessible chat, history, loading/error/retry states, and contract tests.
 5. Provider: real adapter, timeouts, usage/cost tracking, limits, and resilience tests.

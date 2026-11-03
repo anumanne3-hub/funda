@@ -7,6 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field
 class ConversationCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     title: str = Field(default="New conversation", min_length=1, max_length=200)
+    project_id: UUID | None = None
+
+
+class ConversationUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    project_id: UUID | None = None
 
 
 class MessageRead(BaseModel):
@@ -24,6 +30,7 @@ class ConversationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     title: str
+    project_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
     messages: list[MessageRead] = Field(default_factory=list)

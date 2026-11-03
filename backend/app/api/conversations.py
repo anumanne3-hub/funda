@@ -9,16 +9,17 @@ from app.core.security import (
     find_session,
     hash_token,
     new_session_token,
-    require_http_session,
+    owner_identity,
     session_expiry,
 )
 from app.db.session import get_db
-from app.models import AnonymousSession, Conversation
+from app.models import AnonymousSession, Conversation, Project
 from app.schemas.conversation import (
     AnonymousSessionRead,
     ConversationCreate,
     ConversationList,
     ConversationRead,
+    ConversationUpdate,
 )
 
 router = APIRouter()
@@ -53,8 +54,18 @@ def create_anonymous_session(
 def create_conversation(
     payload: ConversationCreate, request: Request, db: Session = Depends(get_db)
 ) -> Conversation:
-    owner = require_http_session(request, db)
-    record = Conversation(anonymous_session_id=owner.id, title=payload.title.strip())
+    field, owner_id = owner_identity(request, db, csrf=True)
+    if payload.project_id and (
+        field != "user_id"
+        or db.scalar(
+            select(Project).where(Project.id == payload.project_id, Project.user_id == owner_id)
+        )
+        is None
+    ):
+        raise HTTPException(status_code=404, detail="Project not found")
+    record = Conversation(
+        **{field: owner_id}, title=payload.title.strip(), project_id=payload.project_id
+    )
     db.add(record)
     db.commit()
     db.refresh(record)
@@ -63,18 +74,37 @@ def create_conversation(
 
 @router.get("/conversations", response_model=ConversationList)
 def list_conversations(
-    request: Request, limit: int = 20, cursor: UUID | None = None, db: Session = Depends(get_db)
+    request: Request,
+    limit: int = 20,
+    cursor: UUID | None = None,
+    project_id: UUID | None = None,
+    db: Session = Depends(get_db),
 ) -> ConversationList:
-    owner = require_http_session(request, db)
+    field, owner_id = owner_identity(request, db)
+    owner_column = getattr(Conversation, field)
     limit = min(max(limit, 1), 50)
     query = (
         select(Conversation)
-        .where(Conversation.anonymous_session_id == owner.id)
+        .where(owner_column == owner_id)
         .order_by(Conversation.updated_at.desc(), Conversation.id.desc())
     )
+    if project_id:
+        if (
+            field != "user_id"
+            or db.scalar(
+                select(Project).where(Project.id == project_id, Project.user_id == owner_id)
+            )
+            is None
+        ):
+            raise HTTPException(status_code=404, detail="Project not found")
+        query = query.where(Conversation.project_id == project_id)
     if cursor:
         cursor_record = db.get(Conversation, cursor)
-        if cursor_record is None or cursor_record.anonymous_session_id != owner.id:
+        if (
+            cursor_record is None
+            or getattr(cursor_record, field) != owner_id
+            or (project_id is not None and cursor_record.project_id != project_id)
+        ):
             raise HTTPException(status_code=404, detail="Conversation not found")
         query = query.where(
             or_(
@@ -97,12 +127,62 @@ def list_conversations(
 def get_conversation(
     conversation_id: UUID, request: Request, db: Session = Depends(get_db)
 ) -> Conversation:
-    owner = require_http_session(request, db)
+    field, owner_id = owner_identity(request, db)
     record = db.scalar(
         select(Conversation)
         .options(selectinload(Conversation.messages))
-        .where(Conversation.id == conversation_id, Conversation.anonymous_session_id == owner.id)
+        .where(Conversation.id == conversation_id, getattr(Conversation, field) == owner_id)
     )
     if record is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return record
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationRead)
+def update_conversation(
+    conversation_id: UUID,
+    payload: ConversationUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Conversation:
+    field, owner_id = owner_identity(request, db, csrf=True)
+    record = db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id, getattr(Conversation, field) == owner_id
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if "title" in payload.model_fields_set:
+        if payload.title is None or not payload.title.strip():
+            raise HTTPException(status_code=422, detail="Title required")
+        record.title = payload.title.strip()
+    if "project_id" in payload.model_fields_set:
+        if payload.project_id is not None and (
+            field != "user_id"
+            or db.scalar(
+                select(Project).where(Project.id == payload.project_id, Project.user_id == owner_id)
+            )
+            is None
+        ):
+            raise HTTPException(status_code=404, detail="Project not found")
+        record.project_id = payload.project_id
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+def delete_conversation(
+    conversation_id: UUID, request: Request, db: Session = Depends(get_db)
+) -> None:
+    field, owner_id = owner_identity(request, db, csrf=True)
+    record = db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id, getattr(Conversation, field) == owner_id
+        )
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    db.delete(record)
+    db.commit()

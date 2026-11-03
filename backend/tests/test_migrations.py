@@ -17,6 +17,8 @@ def test_postgres_sql_migrations_preserve_data_and_match_models():
         raise RuntimeError("Use a dedicated funda_test_* database")
     migrations = sorted((Path(__file__).resolve().parents[2] / "supabase/migrations").glob("*.sql"))
     session_id = uuid4()
+    conversation_id = uuid4()
+    message_id = uuid4()
     engine = create_engine(url)
     with engine.connect() as connection:
         transaction = connection.begin()
@@ -28,9 +30,23 @@ def test_postgres_sql_migrations_preserve_data_and_match_models():
                 "VALUES (%s, %s, now() + interval '1 day')",
                 (session_id, "migration-test"),
             )
+            db.execute(
+                "INSERT INTO conversations (id, anonymous_session_id, title) VALUES (%s, %s, %s)",
+                (conversation_id, session_id, "Before accounts"),
+            )
+            db.execute(
+                "INSERT INTO messages "
+                "(id, conversation_id, sequence_number, role, content, status) "
+                "VALUES (%s, %s, 1, 'user', 'Preserved text', 'completed')",
+                (message_id, conversation_id),
+            )
             for migration in migrations[1:]:
                 db.execute(migration.read_text(), prepare=False)
             assert db.execute("SELECT id FROM anonymous_sessions").fetchone() == (session_id,)
+            assert db.execute(
+                "SELECT version_number, content FROM message_versions WHERE message_id = %s",
+                (message_id,),
+            ).fetchone() == (1, "Preserved text")
             schema = inspect(connection)
             for table in Base.metadata.sorted_tables:
                 columns = {column["name"]: column for column in schema.get_columns(table.name)}
@@ -49,9 +65,11 @@ def test_postgres_sql_migrations_preserve_data_and_match_models():
             assert db.execute(
                 "SELECT count(*) FROM pg_class WHERE relname IN "
                 "('anonymous_sessions','conversations','messages','chat_requests',"
-                "'limit_buckets') AND relnamespace = 'public'::regnamespace "
+                "'limit_buckets','users','account_sessions','projects',"
+                "'message_versions','message_feedback','regeneration_requests') "
+                "AND relnamespace = 'public'::regnamespace "
                 "AND relrowsecurity"
-            ).fetchone() == (5,)
+            ).fetchone() == (11,)
         finally:
             transaction.rollback()
     engine.dispose()

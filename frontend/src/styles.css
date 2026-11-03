@@ -72,6 +72,78 @@ button {
 .new-chat:hover {
   background: #253147;
 }
+.account-controls,
+.project-controls,
+.auth-form {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid #344055;
+  border-radius: 10px;
+}
+.account-controls span {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.account-controls button,
+.project-controls button,
+.auth-form button,
+.conversation-actions button {
+  padding: 7px 9px;
+  border: 1px solid #526077;
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+}
+.auth-form h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.auth-form label,
+.project-controls label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.auth-form input,
+.project-controls select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #526077;
+}
+.conversation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.conversation-actions select {
+  max-width: 180px;
+}
+.message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.message-actions button {
+  padding: 4px 7px;
+  border: 1px solid #bcc4d2;
+  border-radius: 6px;
+  color: #334155;
+  background: #fff;
+  font-size: 12px;
+}
+.chat-notice {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7df;
+  color: #7a4b00;
+  font-size: 13px;
+}
 .section-label {
   margin: 28px 10px 8px;
   color: #8d9ab0;

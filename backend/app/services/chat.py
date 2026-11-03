@@ -8,7 +8,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import ChatRequest, Conversation, Message
+from app.models import ChatRequest, Conversation, Message, MessageVersion
 from app.services.limits import RequestRejected, consume
 
 
@@ -31,20 +31,22 @@ def prepare_chat(
     content: str,
     model: str,
     ip: str = "local",
+    owner_field: str = "anonymous_session_id",
 ) -> PreparedChat:
+    if owner_field not in {"user_id", "anonymous_session_id"}:
+        raise ValueError("Invalid owner field")
+    owner_column = getattr(Conversation, owner_field)
     # Acquire the conversation write lock before checking keys or allocating sequence numbers.
     locked = db.execute(
         update(Conversation)
-        .where(Conversation.id == conversation_id, Conversation.anonymous_session_id == owner_id)
+        .where(Conversation.id == conversation_id, owner_column == owner_id)
         .values(updated_at=Conversation.updated_at)
         .returning(Conversation.id)
     ).first()
     if locked is None:
         raise ConversationNotFound
     conversation = db.scalar(
-        select(Conversation).where(
-            Conversation.id == conversation_id, Conversation.anonymous_session_id == owner_id
-        )
+        select(Conversation).where(Conversation.id == conversation_id, owner_column == owner_id)
     )
     if conversation is None:
         raise ConversationNotFound
@@ -111,6 +113,7 @@ def prepare_chat(
     )
     db.add_all([user_message, assistant])
     db.flush()
+    db.add(MessageVersion(message_id=user_message.id, version_number=1, content=content))
     request = ChatRequest(
         conversation_id=conversation_id,
         user_message_id=user_message.id,
@@ -143,6 +146,7 @@ def complete_chat(
         raise RuntimeError("Persisted chat request disappeared")
     assistant.content = content
     assistant.status = "completed"
+    db.add(MessageVersion(message_id=assistant.id, version_number=1, content=content))
     request.status = "completed"
     request.duration_ms = int((time.perf_counter() - started) * 1000)
     if usage:

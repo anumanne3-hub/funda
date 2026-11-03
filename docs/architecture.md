@@ -68,3 +68,19 @@ the daily request ceiling; the provider account's billing tier remains the sourc
 
 This milestone stores history but sends only the current message to the model. Multi-turn context,
 summaries, RAG, account authentication and long-term memory are separate roadmap milestones.
+
+## Milestone 2 account and project model (local implementation)
+
+`users` own `projects` and account conversations. `account_sessions` store hashed opaque
+tokens, a hashed CSRF token, expiry and revocation. Account writes require the matching
+CSRF header. Anonymous conversations remain tied to their original anonymous session until
+the user explicitly claims or discards them. HTTP queries and WebSocket preparation filter
+by the active account or anonymous owner before accessing a conversation.
+
+Message edits create immutable `message_versions` with a parent version. Activating an
+older version creates a new version that points to that parent. Feedback records the exact
+assistant version rated. Regeneration uses a unique idempotency key per assistant message,
+commits a pending record before calling the provider, then stores a new assistant version.
+Retrying the same key replays a completed version and never starts another provider call.
+The provider still receives only the current user message; contextual branching is planned
+for the later short-term context milestone.

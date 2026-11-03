@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import { resolve } from "node:path";
 
 const external = process.env.SMOKE_BASE_URL;
 const backendPython =
   process.platform === "win32"
-    ? "../backend/.venv/Scripts/python.exe"
+    ? resolve("../backend/.venv/Scripts/python.exe")
     : "../backend/.venv/bin/python";
 export default defineConfig({
   testDir: "./tests",
@@ -22,7 +23,7 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: `${backendPython} ../scripts/test_server.py`,
+          command: `"${backendPython}" ../scripts/test_server.py`,
           url: "http://localhost:8000/ready",
           timeout: 120000,
           reuseExistingServer: false,

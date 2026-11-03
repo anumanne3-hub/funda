@@ -10,9 +10,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
+from app.api.accounts import router as accounts_router
 from app.api.chat import router as chat_router
 from app.api.conversations import router as conversations_router
 from app.api.health import router as health_router
+from app.api.messages import router as messages_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.core.security import hash_token
@@ -38,6 +40,8 @@ app.state.llm_provider = get_provider(settings)
 app.include_router(health_router)
 app.include_router(chat_router, prefix=settings.api_prefix)
 app.include_router(conversations_router, prefix=settings.api_prefix)
+app.include_router(accounts_router, prefix=settings.api_prefix)
+app.include_router(messages_router, prefix=settings.api_prefix)
 
 
 @app.middleware("http")
@@ -46,7 +50,7 @@ async def request_context(request: Request, call_next):
     request.state.request_id = request_id
     started = time.perf_counter()
     origin = request.headers.get("origin")
-    if request.method == "POST" and (
+    if request.method in {"POST", "PATCH", "DELETE"} and (
         (origin and origin not in settings.frontend_origins)
         or (settings.app_env == "production" and not origin)
     ):
@@ -59,10 +63,13 @@ async def request_context(request: Request, call_next):
             },
         )
     try:
-        if request.method == "POST":
+        if request.method in {"POST", "PATCH", "DELETE"}:
             with request.app.state.session_factory() as db:
                 ip = request.client.host if request.client else "unknown"
-                consume(db, f"http:{hash_token(ip)}", 1, settings.sessions_per_minute, 60)
+                auth_attempt = request.url.path.endswith(("/auth/login", "/auth/register"))
+                limit = settings.sessions_per_minute if auth_attempt else 60
+                bucket = "auth" if auth_attempt else "http"
+                consume(db, f"{bucket}:{hash_token(ip)}", 1, limit, 60)
                 db.commit()
         response = await call_next(request)
     except RequestRejected as exc:
@@ -121,8 +128,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.frontend_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Idempotency-Key", "X-Request-ID"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "Idempotency-Key", "X-Request-ID", "X-CSRF-Token"],
 )
 
 

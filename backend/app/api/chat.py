@@ -9,7 +9,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from app.core.config import get_settings
-from app.core.security import websocket_session
+from app.core.security import websocket_owner
 from app.providers import ProviderError
 from app.providers.llm import Usage
 from app.schemas.chat import ChatSendEvent, ServerEvent
@@ -40,7 +40,7 @@ async def chat_socket(websocket: WebSocket) -> None:
     await websocket.accept()
     session_factory = websocket.app.state.session_factory
     with session_factory() as db:
-        owner = websocket_session(websocket, db)
+        owner = websocket_owner(websocket, db)
     if owner is None:
         await send_event(
             websocket,
@@ -75,16 +75,18 @@ async def chat_socket(websocket: WebSocket) -> None:
                 )
                 continue
             with session_factory() as db:
-                owner = websocket_session(websocket, db)
+                owner = websocket_owner(websocket, db)
             if owner is None:
                 await websocket.close(code=4401)
                 return
-            await process_chat(websocket, owner.id, event)
+            await process_chat(websocket, owner[1], owner[0], event)
     except WebSocketDisconnect:
         logger.info("websocket disconnected", extra={"event": "websocket.disconnected"})
 
 
-async def process_chat(websocket: WebSocket, owner_id: UUID, event: ChatSendEvent) -> None:
+async def process_chat(
+    websocket: WebSocket, owner_id: UUID, owner_field: str, event: ChatSendEvent
+) -> None:
     started = time.perf_counter()
     provider = websocket.app.state.llm_provider
     session_factory = websocket.app.state.session_factory
@@ -98,6 +100,7 @@ async def process_chat(websocket: WebSocket, owner_id: UUID, event: ChatSendEven
                 event.content,
                 provider.model,
                 websocket.client.host if websocket.client else "unknown",
+                owner_field=owner_field,
             )
             persisted_request_id = prepared.request.id
             assistant_id = prepared.assistant.id

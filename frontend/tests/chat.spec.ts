@@ -59,3 +59,60 @@ test("mobile composer stays within the viewport", async ({ page }) => {
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
 });
+
+test("account can claim an anonymous chat and organize it", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("Email").fill(`user-${Date.now()}@example.com`);
+  await page.getByLabel("Password").fill("a-long-test-password");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(
+    page.getByRole("button", { name: "Claim anonymous chats" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Claim anonymous chats" }).click();
+  page.once("dialog", (dialog) => void dialog.accept("Research"));
+  await page.getByRole("button", { name: "+ New project" }).click();
+  await expect(page.getByRole("option", { name: "Research" })).toHaveCount(2);
+});
+
+test("account can edit, restore, regenerate and rate a reply", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("Email").fill(`editor-${Date.now()}@example.com`);
+  await page.getByLabel("Password").fill("a-long-test-password");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(
+    page.getByRole("button", { name: "Claim anonymous chats" }),
+  ).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("Connected");
+  await page.getByLabel("Message", { exact: true }).fill("Original prompt");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.locator(".message.assistant")).toHaveCount(1);
+  await expect(page.locator(".message.assistant p")).toContainText(
+    "Mock assistant:",
+  );
+  await expect(page.getByLabel("Streaming response")).toHaveCount(0);
+  page.once("dialog", (dialog) => void dialog.accept("Edited prompt"));
+  await page.getByRole("button", { name: "Edit" }).click();
+  await expect(page.locator(".message.user p")).toHaveText("Edited prompt");
+  await page.getByRole("button", { name: "Versions" }).click();
+  await page.getByRole("button", { name: "Restore v1" }).click();
+  await expect(page.locator(".message.user p")).toHaveText("Original prompt");
+  const regenerated = page.waitForResponse(
+    (response) =>
+      response.url().includes("/regenerate") && response.status() === 200,
+  );
+  await page.getByRole("button", { name: "Regenerate" }).click();
+  await regenerated;
+  await expect(page.getByRole("button", { name: "Regenerate" })).toBeEnabled();
+  await page
+    .getByRole("button", { name: "Helpful answer", exact: true })
+    .click();
+  await expect(page.locator(".error-banner")).toHaveCount(0);
+});

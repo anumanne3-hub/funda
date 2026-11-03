@@ -36,11 +36,19 @@ class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (
         Index("ix_conversations_owner_updated", "anonymous_session_id", "updated_at"),
+        Index("ix_conversations_user_updated", "user_id", "updated_at"),
+        CheckConstraint(
+            "(anonymous_session_id IS NULL) <> (user_id IS NULL)", name="ck_conversation_owner"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     anonymous_session_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("anonymous_sessions.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("anonymous_sessions.id", ondelete="CASCADE"), nullable=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL")
     )
     title: Mapped[str] = mapped_column(String(200), default="New conversation", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -49,7 +57,9 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    anonymous_session: Mapped[AnonymousSession] = relationship(back_populates="conversations")
+    anonymous_session: Mapped[AnonymousSession | None] = relationship(
+        back_populates="conversations"
+    )
     messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",
         cascade="all, delete-orphan",
