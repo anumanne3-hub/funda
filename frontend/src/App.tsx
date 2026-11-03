@@ -67,6 +67,8 @@ export function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [selectedProject, setSelectedProject] = useState<string>("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -79,10 +81,29 @@ export function App() {
   const socketRef = useRef<WebSocket | null>(null);
   const pendingRef = useRef<Pending | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const bootstrapRef = useRef<Promise<{
     items: Conversation[];
     next_cursor: string | null;
   }> | null>(null);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileMenuOpen]);
 
   useEffect(() => {
     let stopped = false;
@@ -608,10 +629,30 @@ export function App() {
     !canRetry;
   return (
     <main className="app-shell">
-      <aside className="sidebar" aria-label="Conversations">
+      {mobileNavOpen && (
+        <button
+          className="mobile-menu-backdrop"
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      <aside
+        id="conversation-navigation"
+        className={`sidebar ${mobileNavOpen ? "open" : ""}`}
+        aria-label="Conversations and account"
+      >
         <div className="brand">
-          <span className="brand-mark">G</span>
-          <span>GenAI Chat</span>
+          <span className="brand-mark">F</span>
+          <span>Funda</span>
+          <button
+            className="mobile-menu-close"
+            type="button"
+            aria-label="Close menu"
+            onClick={() => setMobileNavOpen(false)}
+          >
+            ×
+          </button>
         </div>
         <div className="account-controls">
           {account ? (
@@ -724,7 +765,10 @@ export function App() {
             className={`conversation ${conversation.id === activeId ? "active" : ""}`}
             key={conversation.id}
             type="button"
-            onClick={() => setActiveId(conversation.id)}
+            onClick={() => {
+              setActiveId(conversation.id);
+              setMobileNavOpen(false);
+            }}
           >
             {conversation.title}
           </button>
@@ -740,68 +784,160 @@ export function App() {
       </aside>
       <section className="chat-panel">
         <header className="chat-header">
-          <div>
-            <h1>{active?.title ?? "Starting chat…"}</h1>
-            <p>
-              {account
-                ? "Private account session"
-                : "Private anonymous session"}
-            </p>
-            <div className="conversation-actions">
+          <div className="header-topbar">
+            <div className="header-brand">
+              <span>Funda</span>
+              <span className="brand-live-dot" aria-hidden="true" />
+            </div>
+            <div className="profile-menu" ref={profileMenuRef}>
               <button
+                className="profile-trigger"
                 type="button"
-                onClick={() => void handleRename()}
-                disabled={!activeId}
+                aria-label={`User menu: ${account?.email ?? "Guest"}`}
+                aria-expanded={profileMenuOpen}
+                aria-controls="profile-dropdown"
+                onClick={() => setProfileMenuOpen((open) => !open)}
               >
-                Rename
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={!activeId}
-              >
-                Delete
-              </button>
-              {account && (
-                <select
-                  aria-label="Assign project"
-                  value={active?.project_id ?? ""}
-                  onChange={(event) =>
-                    void handleAssignment(event.target.value)
-                  }
+                <span className="profile-avatar" aria-hidden="true">
+                  {(account?.email ?? "Guest").charAt(0).toUpperCase()}
+                  {connection === "open" && <span className="profile-online" />}
+                </span>
+                <span
+                  className="header-account"
+                  title={account?.email ?? "Guest"}
                 >
-                  <option value="">No project</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
+                  {account?.email ?? "Guest"}
+                </span>
+                <span className="profile-chevron" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" focusable="false">
+                    <path d="m3 6 5 5 5-5" />
+                  </svg>
+                </span>
+              </button>
+              {profileMenuOpen && (
+                <div className="profile-dropdown" id="profile-dropdown">
+                  {account ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          void handleLogout();
+                        }}
+                      >
+                        Log out
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          void handleLogoutAll();
+                        }}
+                      >
+                        Log out everywhere
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setAuthMode("login");
+                          setMobileNavOpen(true);
+                        }}
+                      >
+                        Log in
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setAuthMode("register");
+                          setMobileNavOpen(true);
+                        }}
+                      >
+                        Create account
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <button
+              className="mobile-menu-toggle"
+              type="button"
+              aria-controls="conversation-navigation"
+              aria-expanded={mobileNavOpen}
+              onClick={() => setMobileNavOpen((open) => !open)}
+            >
+              Menu
+            </button>
+          </div>
+          <div className="header-details">
+            <div>
+              <h1>{active?.title ?? "Starting chat…"}</h1>
+              <p>
+                {account
+                  ? "Private account session"
+                  : "Private anonymous session"}
+              </p>
+              <div className="conversation-actions">
+                <button
+                  type="button"
+                  onClick={() => void handleRename()}
+                  disabled={!activeId}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  disabled={!activeId}
+                >
+                  Delete
+                </button>
+                {account && (
+                  <select
+                    aria-label="Assign project"
+                    value={active?.project_id ?? ""}
+                    onChange={(event) =>
+                      void handleAssignment(event.target.value)
+                    }
+                  >
+                    <option value="">No project</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="mobile-conversations">
+                <select
+                  aria-label="Choose conversation"
+                  value={activeId ?? ""}
+                  onChange={(event) => setActiveId(event.target.value)}
+                >
+                  {conversations.map((conversation) => (
+                    <option key={conversation.id} value={conversation.id}>
+                      {conversation.title}
                     </option>
                   ))}
                 </select>
-              )}
+                <button type="button" onClick={() => void newChat()}>
+                  New chat
+                </button>
+                {nextCursor && (
+                  <button onClick={() => void loadMore()}>More</button>
+                )}
+              </div>
             </div>
-            <div className="mobile-conversations">
-              <select
-                aria-label="Choose conversation"
-                value={activeId ?? ""}
-                onChange={(event) => setActiveId(event.target.value)}
-              >
-                {conversations.map((conversation) => (
-                  <option key={conversation.id} value={conversation.id}>
-                    {conversation.title}
-                  </option>
-                ))}
-              </select>
-              <button type="button" onClick={() => void newChat()}>
-                New chat
-              </button>
-              {nextCursor && (
-                <button onClick={() => void loadMore()}>More</button>
-              )}
-            </div>
+            <span className={`status ${connection}`} role="status">
+              {connection === "open" ? "Connected" : connection}
+            </span>
           </div>
-          <span className={`status ${connection}`} role="status">
-            {connection === "open" ? "Connected" : connection}
-          </span>
         </header>
         <div className="messages" aria-live="polite">
           <div className="message-list">

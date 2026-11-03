@@ -5,7 +5,14 @@ test("chat survives reload and stays isolated between browser sessions", async (
   browser,
 }) => {
   await page.goto("/");
+  await expect(page).toHaveTitle("Funda");
+  await expect(page.locator(".header-brand")).toHaveText("Funda");
+  await expect(page.locator(".header-account")).toHaveText("Guest");
   await expect(page.getByRole("status")).toHaveText("Connected");
+  await page.getByRole("button", { name: "User menu: Guest" }).click();
+  await expect(page.locator(".profile-dropdown")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".profile-dropdown")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Send message" }),
   ).toBeDisabled();
@@ -48,7 +55,28 @@ test("reload during a stream reuses its original request", async ({ page }) => {
 test("mobile composer stays within the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  await expect(page.locator(".header-brand")).toHaveText("Funda");
+  await expect(page.locator(".header-account")).toHaveText("Guest");
   await expect(page.getByRole("status")).toHaveText("Connected");
+  await page.getByRole("button", { name: "User menu: Guest" }).click();
+  await page
+    .locator(".profile-dropdown")
+    .getByRole("button", { name: "Log in" })
+    .click();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await page.getByRole("button", { name: "Close menu" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Create account" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByLabel("Password")).toBeVisible();
+  await page.getByRole("button", { name: "Close menu" }).click();
+  await expect(
+    page.getByRole("button", { name: "Menu", exact: true }),
+  ).toHaveAttribute("aria-expanded", "false");
   const box = await page.getByLabel("Message", { exact: true }).boundingBox();
   await expect(page.getByLabel("Choose conversation")).toBeVisible();
   await page.getByRole("button", { name: "New chat", exact: true }).click();
@@ -57,7 +85,71 @@ test("mobile composer stays within the viewport", async ({ page }) => {
   ).toHaveCount(2);
   expect(box).not.toBeNull();
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 320, height: 640 });
+  await expect(
+    page.getByRole("button", { name: "Menu", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(320);
+});
+
+test("desktop sidebar uses 40% width and scrolls independently", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1000, height: 600 });
+  await page.goto("/");
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar).toBeVisible();
+  const box = await sidebar.boundingBox();
+  expect(box?.width).toBe(400);
+  await sidebar.evaluate((element) => {
+    for (let i = 0; i < 30; i += 1) {
+      const item = document.createElement("div");
+      item.textContent = `Conversation ${i}`;
+      item.style.padding = "12px";
+      element.append(item);
+    }
+    element.scrollTop = element.scrollHeight;
+  });
+  expect(
+    await sidebar.evaluate((element) => element.scrollTop),
+  ).toBeGreaterThan(0);
+  expect(
+    await page.locator(".messages").evaluate((element) => element.scrollTop),
+  ).toBe(0);
+});
+
+test("long chat scrolls messages while header and composer stay visible", async ({
+  page,
+}) => {
+  for (const width of [1000, 390]) {
+    await page.setViewportSize({ width, height: 600 });
+    await page.goto("/");
+    const header = page.locator(".chat-header");
+    const composer = page.locator(".composer");
+    const messages = page.locator(".messages");
+    const headerTop = (await header.boundingBox())!.y;
+    const composerTop = (await composer.boundingBox())!.y;
+    await page.locator(".message-list").evaluate((element) => {
+      const longMessage = document.createElement("div");
+      longMessage.style.height = "1800px";
+      element.append(longMessage);
+    });
+    await messages.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    expect(
+      await messages.evaluate((element) => element.scrollTop),
+    ).toBeGreaterThan(0);
+    expect((await header.boundingBox())!.y).toBe(headerTop);
+    expect((await composer.boundingBox())!.y).toBe(composerTop);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  }
 });
 
 test("account can claim an anonymous chat and organize it", async ({
@@ -66,9 +158,18 @@ test("account can claim an anonymous chat and organize it", async ({
   await page.goto("/");
   await expect(page.getByRole("status")).toHaveText("Connected");
   await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByLabel("Email").fill(`user-${Date.now()}@example.com`);
+  const email = `user-${Date.now()}@example.com`;
+  await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("a-long-test-password");
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(".header-account")).toHaveText(email);
+  await page.getByRole("button", { name: `User menu: ${email}` }).click();
+  await expect(
+    page
+      .locator(".profile-dropdown")
+      .getByRole("button", { name: "Log out", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Claim anonymous chats" }),
   ).toBeVisible();
