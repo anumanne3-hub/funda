@@ -24,6 +24,11 @@ uv run --locked uvicorn app.main:app --reload --ws-max-size 65536
 In another terminal:
 
 ```powershell
+
+$env:Path = "D:\My\1a_funda\funda\.tools\node-v26.13.0-win-x64;$env:Path"
+
+npm.cmd ci
+npm.cmd run dev
 cd frontend
 npm ci
 npm run dev
