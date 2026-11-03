@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 from uuid import uuid4
 
 import httpx
@@ -11,6 +12,18 @@ base = os.environ["SMOKE_API_URL"].rstrip("/")
 origin = os.environ["SMOKE_BASE_URL"].rstrip("/")
 require_real_provider = os.environ.get("SMOKE_REQUIRE_REAL_PROVIDER", "false").lower() == "true"
 headers = {"Origin": origin}
+if checkpoint_to_verify := os.environ.get("SMOKE_VERIFY_CHECKPOINT"):
+    checkpoint = json.loads(Path(checkpoint_to_verify).read_text())
+    assert checkpoint["base"] == base and checkpoint["origin"] == origin
+    with httpx.Client(
+        base_url=base, headers=headers, cookies=checkpoint["cookies"], timeout=60
+    ) as client:
+        client.get("/ready").raise_for_status()
+        response = client.get(f"/api/v1/conversations/{checkpoint['conversation']}")
+        response.raise_for_status()
+        assert response.json()["messages"] == checkpoint["messages"], "History changed"
+    print("Saved conversation and messages match the pre-restart checkpoint.")
+    raise SystemExit(0)
 with httpx.Client(base_url=base, headers=headers, timeout=60) as client:
     assert client.get("/health").json()["status"] == "ok"
     assert client.get("/ready").json()["status"] == "ready"
@@ -43,4 +56,13 @@ with httpx.Client(base_url=base, headers=headers, timeout=60) as client:
         other.post("/api/v1/anonymous-session").raise_for_status()
         assert other.get(f"/api/v1/conversations/{conversation}").status_code == 404
         assert not other.get("/api/v1/conversations").json()["items"]
+    if checkpoint_path := os.environ.get("SMOKE_CHECKPOINT_FILE"):
+        # This contains a test-session bearer cookie. Keep it in an ignored local folder.
+        path = Path(checkpoint_path)
+        assert ".tools" in path.resolve().parts, "Store checkpoints under ignored .tools"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "base": base, "origin": origin, "conversation": conversation,
+            "cookies": dict(client.cookies), "messages": messages,
+        }))
 print("Public health, streaming, retry and isolation smoke checks passed.")
