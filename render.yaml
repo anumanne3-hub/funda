@@ -5,7 +5,6 @@ services:
     rootDir: backend
     plan: starter
     buildCommand: pip install uv==0.13.6 && uv sync --locked
-    preDeployCommand: uv run --locked alembic upgrade head
     startCommand: uv run --locked uvicorn app.main:app --host 0.0.0.0 --port $PORT --ws-max-size 65536
     healthCheckPath: /ready
     autoDeployTrigger: checksPass
@@ -15,8 +14,6 @@ services:
       - key: APP_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
-      - key: MIGRATION_DATABASE_URL
         sync: false
       - key: FRONTEND_ORIGINS
         sync: false

@@ -1,35 +1,57 @@
+import os
 from pathlib import Path
+from uuid import uuid4
 
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import create_engine, inspect, text
+import pytest
+from sqlalchemy import create_engine, inspect
 
-from app.core.config import get_settings
+from app.db.base import Base
+from app.models import chat  # noqa: F401
 
 
-def test_upgrade_downgrade_and_reopen(tmp_path: Path, monkeypatch):
-    url = f"sqlite:///{(tmp_path / 'migration.db').as_posix()}"
-    monkeypatch.setattr(get_settings(), "database_url", url)
-    monkeypatch.setattr(get_settings(), "migration_database_url", None)
-    config = Config("alembic.ini")
-    command.upgrade(config, "head")
+def test_postgres_sql_migrations_preserve_data_and_match_models():
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("SQL migrations require disposable PostgreSQL TEST_DATABASE_URL")
+    if not url.rsplit("/", 1)[-1].startswith("funda_test_"):
+        raise RuntimeError("Use a dedicated funda_test_* database")
+    migrations = sorted((Path(__file__).resolve().parents[2] / "supabase/migrations").glob("*.sql"))
+    session_id = uuid4()
     engine = create_engine(url)
-    with engine.begin() as db:
-        db.execute(
-            text(
-                "INSERT INTO limit_buckets (key, value, expires_at) "
-                "VALUES ('restart-test', 7, '2027-01-01')"
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        db = connection.connection.driver_connection
+        try:
+            db.execute(migrations[0].read_text(), prepare=False)
+            db.execute(
+                "INSERT INTO anonymous_sessions (id, token_hash, expires_at) "
+                "VALUES (%s, %s, now() + interval '1 day')",
+                (session_id, "migration-test"),
             )
-        )
-    engine.dispose()
-    reopened = create_engine(url)
-    with reopened.connect() as db:
-        assert db.scalar(text("SELECT value FROM limit_buckets WHERE key='restart-test'")) == 7
-    reopened.dispose()
-    command.downgrade(config, "base")
-    command.upgrade(config, "head")
-    engine = create_engine(url)
-    assert {"messages", "chat_requests", "anonymous_sessions", "limit_buckets"}.issubset(
-        inspect(engine).get_table_names()
-    )
+            for migration in migrations[1:]:
+                db.execute(migration.read_text(), prepare=False)
+            assert db.execute("SELECT id FROM anonymous_sessions").fetchone() == (session_id,)
+            schema = inspect(connection)
+            for table in Base.metadata.sorted_tables:
+                columns = {column["name"]: column for column in schema.get_columns(table.name)}
+                assert set(columns) == set(table.columns.keys())
+                for column in table.columns:
+                    assert columns[column.name]["nullable"] == column.nullable
+                    assert str(columns[column.name]["type"].compile(dialect=engine.dialect)) == str(
+                        column.type.compile(dialect=engine.dialect)
+                    )
+                assert set(schema.get_pk_constraint(table.name)["constrained_columns"]) == {
+                    column.name for column in table.primary_key
+                }
+                assert {index["name"] for index in schema.get_indexes(table.name)} >= {
+                    index.name for index in table.indexes
+                }
+            assert db.execute(
+                "SELECT count(*) FROM pg_class WHERE relname IN "
+                "('anonymous_sessions','conversations','messages','chat_requests',"
+                "'limit_buckets') AND relnamespace = 'public'::regnamespace "
+                "AND relrowsecurity"
+            ).fetchone() == (5,)
+        finally:
+            transaction.rollback()
     engine.dispose()

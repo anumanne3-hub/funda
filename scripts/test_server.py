@@ -17,9 +17,8 @@ with tempfile.TemporaryDirectory(prefix="e2e-", dir=root / ".tools") as director
         "SESSION_COOKIE_SECURE": "false", "SESSION_COOKIE_SAMESITE": "lax",
         "FRONTEND_ORIGINS": "http://localhost:5173", "SESSIONS_PER_MINUTE": "1000",
     })
-    from alembic import command
-    from alembic.config import Config
+    from app.db.init_local import main as init_local
     import uvicorn
 
-    command.upgrade(Config("alembic.ini"), "head")
+    init_local()
     uvicorn.run("app.main:app", host="127.0.0.1", port=8000, ws_max_size=65536)

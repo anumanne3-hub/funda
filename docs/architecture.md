@@ -1,7 +1,7 @@
 # Milestone 1 architecture and API
 
 React talks to FastAPI through credentialed HTTP and a WebSocket. PostgreSQL is the durable store;
-SQLAlchemy sessions are short-lived and released before provider streaming. Alembic owns the schema.
+SQLAlchemy sessions are short-lived and released before provider streaming. Versioned SQL files in `supabase/migrations` own the PostgreSQL schema; the Supabase CLI or GitHub integration applies them.
 The provider can be mock, native Gemini, or an OpenAI-compatible chat-completion endpoint.
 
 ## Identity and privacy

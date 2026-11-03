@@ -1,6 +1,6 @@
 ﻿# Milestone 1 tracker — v0.1.0
 
-Updated 2026-11-02. `[x]` implemented and locally verified; `[~]` implemented with external
+Updated 2026-11-03. `[x]` implemented and locally verified; `[~]` implemented with external
 verification pending; `[ ]` not completed. Do not equate a deployment template with a live deployment.
 
 1. [x] Execution order and acceptance gates.
@@ -9,8 +9,8 @@ verification pending; `[ ]` not completed. Do not equate a deployment template w
 4. [x] Versioned WebSocket protocol and deterministic mock streaming.
 5. [x] Responsive chat, conversation navigation, empty/loading/error/disabled/retry states.
 6. [x] Python uv.lock, npm package-lock.json, formatting, lint, type checks, production build and audits.
-7. [x] PostgreSQL Compose configuration, SQLAlchemy sessions and Alembic; portable PostgreSQL tested locally.
-8. [x] Initial schema migration plus 0002_limits_and_cost; PostgreSQL upgrade/check/downgrade/upgrade verified.
+7. [x] PostgreSQL Compose configuration, SQLAlchemy sessions and Supabase-native SQL migrations; portable PostgreSQL tested locally.
+8. [x] Timestamped initial schema and limits/cost SQL migrations; hosted application pending.
 9. [x] Opaque anonymous cookies, hashed tokens, ownership-scoped HTTP/WebSocket access and origin checks.
 10. [x] Conversation create/list/detail with composite cursor ordering and frontend load-more controls.
 11. [x] Transactional message/request states and persisted streamed results.
@@ -35,7 +35,7 @@ verification pending; `[ ]` not completed. Do not equate a deployment template w
 - PostgreSQL 18: 23 backend tests passed, including concurrent duplicate requests.
 - SQLite suite: 21 passed and the PostgreSQL concurrency case skipped before adding the Gemini
   adapter test; the final full check is recorded below when rerun.
-- Real PostgreSQL migrations: upgrade, schema drift check, downgrade and re-upgrade passed.
+- Previous Alembic roundtrip passed before conversion. SQL migration verification is recorded below.
 - API and workspace PostgreSQL restart: committed history and duplicate-free retry preserved.
 - Frontend: production build, TypeScript and ESLint passed.
 - Chromium: 3 browser tests passed; the first Windows sandbox run needed helper-process cleanup.
@@ -60,3 +60,9 @@ verification pending; `[ ]` not completed. Do not equate a deployment template w
 - API/database restarts preserve data.
 - Provider errors are controlled and leave the API healthy.
 - Secrets are absent from source, frontend assets, error responses and logs.
+
+## Supabase SQL migration conversion
+
+- Native SQL migrations now live at repository-root `supabase/migrations`.
+- Removed both Python migration trees and Render Alembic pre-deploy command.
+- Existing hosted schemas require inspection/baselining; no remote database was changed.

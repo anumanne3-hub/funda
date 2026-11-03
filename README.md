@@ -7,6 +7,7 @@ PostgreSQL and a mock / Gemini / OpenAI-compatible provider. See [status](MILEST
 ## Local setup
 
 Prerequisites: Python 3.13, Node.js 26, npm, and PostgreSQL 18 (or Docker Compose).
+The commands below use Supabase CLI 3.0.0 via `npx`.
 The development SQLite fallback is useful for a quick demo; production requires PostgreSQL.
 
 From the repository root:
@@ -16,22 +17,21 @@ docker compose up -d
 cd backend
 python -m pip install uv==0.13.6
 uv sync --locked --extra dev
-Copy-Item .env.example .env
-uv run --locked alembic upgrade head
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+cd ..
+npx supabase@3.0.0 db push --remote="postgresql://genai:genai@localhost:5432/genai_chatbot?sslmode=disable"
+cd backend
 uv run --locked uvicorn app.main:app --reload --ws-max-size 65536
 ```
 
-In another terminal:
+In another terminal, from the repository root:
 
 ```powershell
-
-$env:Path = "D:\My\1a_funda\funda\.tools\node-v26.13.0-win-x64;$env:Path"
-
+cd frontend
+# If Node is not on PATH, use the existing workspace installation:
+# $env:Path = "D:\My\1a_funda\funda\.tools\node-v26.13.0-win-x64;$env:Path"
 npm.cmd ci
 npm.cmd run dev
-cd frontend
-npm ci
-npm run dev
 ```
 
 Open http://localhost:5173. The default mock costs nothing. For a free hosted Gemini model,
@@ -40,14 +40,15 @@ billing or add secrets to frontend settings. `LLM_PROVIDER=gemini` requires a re
 it is not enabled automatically by the test setup.
 
 For a SQLite-only demo, set `DATABASE_URL=sqlite:///./genai_chatbot.db` in `backend/.env`,
-then run the same migrations and API commands. Never use this fallback for deployment.
+run `uv run --locked python -m app.db.init_local` from `backend`, then start the API.
+SQLite is a demo initialized from ORM metadata, not a SQL migration test. Never use it for deployment.
 
 ## Verification
 
 ```powershell
 cd backend
-uv run --locked ruff format --check app tests migrations
-uv run --locked ruff check app tests migrations
+uv run --locked ruff format --check app tests
+uv run --locked ruff check app tests
 uv run --locked mypy app
 uv run --locked pytest -q
 uv run --locked pip-audit --local --skip-editable
@@ -70,7 +71,8 @@ processes. In a restricted workspace use a fresh `--basetemp ../.tools/pytest-UN
 For PostgreSQL integration tests create an **empty disposable** database whose name begins
 `funda_test_`, set `TEST_DATABASE_URL`, and run pytest. These tests create/drop their test tables;
 never point them at a development or production database. The concurrency test runs only on PostgreSQL.
-CI runs both SQLite and PostgreSQL suites and a clean migration upgrade/downgrade/upgrade cycle.
+CI runs both SQLite and PostgreSQL suites, applies the SQL migrations to a disposable database,
+and checks schema compatibility and data preservation.
 
 For process restart verification, use a separate disposable `funda_test_*` database and run:
 
@@ -90,9 +92,9 @@ Root Directory: `backend`
 
 - Build: `pip install uv==0.13.6 && uv sync --locked`
 - Start: `uv run --locked uvicorn app.main:app --host 0.0.0.0 --port $PORT --ws-max-size 65536`
-- Pre-deploy: `uv run --locked alembic upgrade head`
+- Pre-deploy: leave blank; Supabase deploys SQL migrations separately before the API rollout.
 - Health check: `/ready`
 
-See the deployment guide for free-plan migration handling, Supabase connections, production
+See the deployment guide for Supabase GitHub migration setup, database connections, production
 cookies/CORS, Vercel configuration and the automated public smoke workflow. Release `v0.1.0`
 remains gated on real-provider, hosted CI and public deployment verification.

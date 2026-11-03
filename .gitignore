@@ -20,3 +20,5 @@ frontend/vite.config.js
 frontend/vite.config.d.ts
 playwright-report/
 test-results/
+supabase/.temp/
+supabase/.branches/

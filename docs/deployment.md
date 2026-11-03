@@ -5,11 +5,53 @@ connected accounts and backend secrets. Do not paste credentials into chat or co
 
 ## Supabase
 
-Use a PostgreSQL connection with TLS (`sslmode=require`). Store it only on the API host.
-Use a session-mode pooler or direct connection for `MIGRATION_DATABASE_URL`; the migration process
-must not use transaction-pooling mode. The API defaults to a small pool with no overflow.
-Run `uv run --locked alembic upgrade head` once per release. Migration 0002 adds budget/limit
-records and cost columns without changing existing chat data.
+The source of truth is `supabase/migrations/*.sql` at the repository root, alongside
+`supabase/config.toml`. These are native PostgreSQL SQL files, not Python migrations.
+
+### GitHub deployment
+
+In the Supabase GitHub integration, select this repository and its production branch.
+Set the project working directory to the **repository root** (usually `/`), which contains
+`supabase/config.toml`. Do not set it to `backend` or `backend/supabase`.
+Enable the integration's production migration deployment option for the intended branch;
+merely connecting GitHub is not enough. Preview/automatic branching is optional.
+Check the Supabase GitHub deployment logs after pushing the SQL files.
+See [GitHub integration](https://supabase.com/docs/guides/deployment/branching/github-integration).
+
+### CLI alternative and local PostgreSQL
+
+From the repository root, use `npx supabase@3.0.0 db push --remote=<POSTGRESQL_URI>`.
+For a local Compose database, see the README. For hosted deployment, store the URI privately
+and pass it from an environment variable rather than pasting passwords into command history:
+
+```powershell
+npx supabase@3.0.0 db push --remote=$env:MIGRATION_DATABASE_URL
+```
+
+The Supabase CLI URI must start with `postgresql://`; Render's SQLAlchemy `DATABASE_URL`
+starts with `postgresql+psycopg://`. The CLI does not automatically load `backend/.env`.
+Use a direct or **session-mode pooler** URI with `sslmode=require`; do not use the transaction
+pooler for migrations. On IPv4 networks, choose Session pooler from Supabase's Connect panel.
+The API defaults to a small connection pool with no overflow. No database secret belongs in Git.
+
+### Existing databases previously migrated with Alembic
+
+Do not reset a remote database or replay the initial SQL over existing application tables.
+Back up the database and inspect its tables and `alembic_version` first. If it is empty,
+apply both SQL migrations normally. If Alembic already created tables, compare the existing
+schema with both SQL files before baselining history:
+
+- If the initial schema exactly matches, mark only `20261103000000` applied with
+  `npx supabase@3.0.0 migration repair 20261103000000 --status applied --remote=<POSTGRESQL_URI>`,
+  then push the remaining migration.
+- If both old revisions are already applied and match the SQL, first apply the five
+  `ENABLE ROW LEVEL SECURITY` statements from the second SQL file (the old migrations did
+  not include these), then mark both `20261103000000` and `20261103000100` applied.
+- Do not mark a migration applied merely because an old version row exists. If the schema
+  differs or is partial, reconcile it before repair. Keep the old history table until verified.
+
+The SQL files intentionally fail on conflicting tables rather than silently skipping schema
+checks. Neither conversion nor GitHub connection applies anything to a remote DB by itself.
 
 ## Render
 
@@ -20,13 +62,11 @@ cookie settings from Render to use the code defaults. Local development defaults
 `http://localhost:5173`, non-secure cookies and `SameSite=lax`; keep
 `APP_ENV=development` in the local `.env`. Do not copy the local `.env` to Render.
 
-The repository's `render.yaml` defines the API, locked install, `/ready` health check and one
-pre-deploy migration command. The template uses a Starter service for the pre-deploy step.
-For an existing Free service, run the migration separately once before deploying; do not
-change an existing service's billing plan just to apply this template.
+The repository's `render.yaml` builds and starts the API and checks `/ready`.
+It no longer runs migrations at API deployment time. Remove an existing Alembic pre-deploy
+command in the Render dashboard. Apply Supabase migrations before deploying the API.
 
-Set `APP_ENV=production`, `SESSION_COOKIE_SECURE=true`, exact `FRONTEND_ORIGINS`, and both database
-URLs. For separate `vercel.app` / `onrender.com` domains use `SESSION_COOKIE_SAMESITE=none`.
+Set `APP_ENV=production`, `SESSION_COOKIE_SECURE=true`, exact `FRONTEND_ORIGINS`, and `DATABASE_URL`. Migration credentials are only needed where the Supabase CLI runs. For separate `vercel.app` / `onrender.com` domains use `SESSION_COOKIE_SAMESITE=none`.
 Some browsers block third-party cookies; for reliable browser support use same-site custom
 domains such as `chat.example.com` and `api.example.com`, with `SameSite=lax`.
 Test the intended browser/domain combination before release. WebSockets connect directly to Render.
@@ -76,6 +116,6 @@ belongs in `VITE_*`. Never expose database credentials, service-role keys, or pr
 6. Tag `v0.1.0` only after all gates pass. An unverified release must remain untagged.
 
 Rollback the API/frontend to the previous known-good commit while retaining additive migrations.
-Never run the destructive Alembic downgrade on production chat data. Keep a database backup before
+Never reset or drop tables in the production database. Keep a database backup before
 schema changes. Public CI runs, hosted smoke tests and the real provider call must be recorded in
 the tracker after they actually run.

@@ -18,8 +18,12 @@ if "funda_test_" not in url.rsplit("/", 1)[-1]:
 env = {**os.environ, "DATABASE_URL": url, "MIGRATION_DATABASE_URL": url,
        "LLM_PROVIDER": "mock", "APP_ENV": "development", "SESSION_COOKIE_SECURE": "false",
        "SESSION_COOKIE_SAMESITE": "lax"}
-subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
-               cwd=root / "backend", env=env, check=True)
+# This tool is restricted above to a disposable funda_test_* database.
+import psycopg
+
+with psycopg.connect(url.replace("postgresql+psycopg://", "postgresql://", 1)) as db:
+    for migration in sorted((root / "supabase/migrations").glob("*.sql")):
+        db.execute(migration.read_text(encoding="utf-8"), prepare=False)
 log = (root / ".tools/restart-api.log").open("w", encoding="utf-8")
 
 
