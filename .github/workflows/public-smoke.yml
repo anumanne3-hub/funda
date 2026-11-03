@@ -29,6 +29,7 @@ jobs:
         env:
           SMOKE_API_URL: ${{ inputs.api_url }}
           SMOKE_BASE_URL: ${{ inputs.frontend_url }}
+          SMOKE_REQUIRE_REAL_PROVIDER: 'true'
       - run: npm ci && npx playwright install --with-deps chromium && npm test
         working-directory: frontend
         env:

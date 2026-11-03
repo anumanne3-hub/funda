@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     """Validated environment configuration loaded once at process startup."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
     app_env: str = "development"
     app_name: str = "genai-chatbot-api"
@@ -41,8 +41,11 @@ class Settings(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def environment_defaults(cls, values: object) -> object:
-        if isinstance(values, dict) and values.get("app_env") == "production":
+        if isinstance(values, dict):
             values = dict(values)
+            if values.get("llm_provider") == "gemini":
+                values.setdefault("llm_model", "gemini-3.1-flash-lite")
+        if isinstance(values, dict) and values.get("app_env") == "production":
             values.setdefault(
                 "frontend_origins",
                 ["https://funda-geni.vercel.app", "https://funda-phi.vercel.app"],
@@ -56,8 +59,10 @@ class Settings(BaseSettings):
         if self.session_cookie_samesite == "none" and not self.session_cookie_secure:
             raise ValueError("SameSite=None requires secure cookies")
         if self.llm_provider != "mock":
-            if not self.llm_api_key or self.llm_model == "mock-stream-v1":
-                raise ValueError("A provider key and model are required")
+            if not self.llm_api_key or not self.llm_api_key.strip():
+                raise ValueError("LLM_API_KEY is required for the selected LLM_PROVIDER")
+            if not self.llm_model.strip() or self.llm_model == "mock-stream-v1":
+                raise ValueError("LLM_MODEL must name a real provider model, not mock-stream-v1")
             if (
                 not self.llm_free_tier
                 and min(self.llm_input_usd_per_million, self.llm_output_usd_per_million) <= 0

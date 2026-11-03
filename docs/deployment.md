@@ -108,7 +108,8 @@ belongs in `VITE_*`. Never expose database credentials, service-role keys, or pr
 
 1. Run all CI checks on the exact release commit.
 2. Deploy migrations/API, check `/health` and `/ready`, then deploy the frontend.
-3. Run the `Public smoke test` GitHub workflow with the frontend and API URLs. It creates demo
+3. Run the `Public smoke test` GitHub workflow with the frontend and API URLs. It requires a real
+   provider response and rejects the deterministic mock reply. It creates demo
    conversations and makes a small number of model calls; keep within the free quota.
 4. Confirm browser isolation, reload/reconnect recovery, and absence of secrets in assets/logs.
 5. Restart the API; confirm existing conversation history remains. Verify database restart
@@ -140,3 +141,25 @@ If the first `POST /api/v1/anonymous-session` fails, use its `request_id` to fin
 Keep RLS enabled. The frontend calls the API; it does not need direct database write policies.
 The API needs the database URI, not a Supabase HTTP API key. A database with empty tables is
 supported and requires no seed session.
+
+
+For the same strict API smoke check from `backend`:
+
+```powershell
+$env:SMOKE_API_URL = 'https://funda-g0wg.onrender.com'
+$env:SMOKE_BASE_URL = 'https://funda-geni.vercel.app'
+$env:SMOKE_REQUIRE_REAL_PROVIDER = 'true'
+uv run --locked python ../scripts/smoke.py
+```
+
+`Milestone 1 checks` also supports manual runs from GitHub Actions. Enable Actions for the
+repository if needed, then run it on the final release commit. A Vercel deployment check alone
+is not evidence that the backend and frontend CI suites passed.
+
+
+If startup reports a provider settings validation error, check Render's explicit environment
+values. Set `LLM_MODEL=gemini-3.1-flash-lite`; remove an old `mock-stream-v1` override.
+Gemini defaults to this model when `LLM_MODEL` is omitted, but explicit overrides are preserved.
+Set `LLM_PROVIDER=gemini`, a nonblank `LLM_API_KEY`, `LLM_FREE_TIER=true`, and both price
+variables to zero. Settings validation does not authenticate the key with Google.
+Validation errors omit input values so backend credentials are not printed in startup errors.
