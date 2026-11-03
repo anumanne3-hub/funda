@@ -55,3 +55,60 @@ def test_postgres_sql_migrations_preserve_data_and_match_models():
         finally:
             transaction.rollback()
     engine.dispose()
+
+
+def test_first_session_against_sql_migrations(monkeypatch):
+    """Exercise the actual HTTP path against SQL migrations, not create_all."""
+    from fastapi.testclient import TestClient
+    from sqlalchemy import func, select
+    from sqlalchemy.orm import sessionmaker
+
+    from app.core.config import get_settings
+    from app.db.session import get_db
+    from app.main import app
+    from app.models import AnonymousSession
+    from app.models.chat import LimitBucket
+
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("SQL migrations require disposable PostgreSQL TEST_DATABASE_URL")
+    if not url.rsplit("/", 1)[-1].startswith("funda_test_"):
+        raise RuntimeError("Use a dedicated funda_test_* database")
+    migrations = sorted((Path(__file__).resolve().parents[2] / "supabase/migrations").glob("*.sql"))
+    engine = create_engine(url)
+    try:
+        with engine.connect() as connection:
+            connection.begin()  # Closing the connection rolls back migrations and writes.
+            for migration in migrations:
+                connection.connection.driver_connection.execute(
+                    migration.read_text(), prepare=False
+                )
+            factory = sessionmaker(
+                bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+            )
+            monkeypatch.setattr(app.state, "session_factory", factory)
+
+            def migrated_db():
+                with factory() as db:
+                    yield db
+
+            app.dependency_overrides[get_db] = migrated_db
+            try:
+                with TestClient(app, base_url="https://testserver") as client:
+                    assert client.get("/ready").status_code == 200
+                    with factory() as db:
+                        assert db.scalar(select(func.count()).select_from(AnonymousSession)) == 0
+                        assert db.scalar(select(func.count()).select_from(LimitBucket)) == 0
+                    origin = get_settings().frontend_origins[0]
+                    response = client.post("/api/v1/anonymous-session", headers={"origin": origin})
+                    assert response.status_code == 200, response.text
+                    assert response.headers["access-control-allow-origin"] == origin
+                    assert client.cookies.get(get_settings().session_cookie_name)
+                    second = client.post("/api/v1/anonymous-session", headers={"origin": origin})
+                    assert second.json()["id"] == response.json()["id"]
+                    with factory() as db:
+                        assert db.scalar(select(func.count()).select_from(AnonymousSession)) == 1
+            finally:
+                app.dependency_overrides.pop(get_db, None)
+    finally:
+        engine.dispose()

@@ -119,3 +119,24 @@ Rollback the API/frontend to the previous known-good commit while retaining addi
 Never reset or drop tables in the production database. Keep a database backup before
 schema changes. Public CI runs, hosted smoke tests and the real provider call must be recorded in
 the tracker after they actually run.
+
+
+## First-session database failures
+
+`GET /ready` validates application columns and probes the rate-limit and anonymous-session
+writes in a transaction that is rolled back. It leaves no session or rate-limit data behind.
+A successful connectivity check alone does not establish that the backend can write under RLS.
+
+If the first `POST /api/v1/anonymous-session` fails, use its `request_id` to find the
+`http.request.failed` entry in Render logs. Database failures return HTTP 503 with:
+
+- `DATABASE_SCHEMA_ERROR`: apply both SQL migrations to the database configured in Render,
+  and check its schema/search path.
+- `DATABASE_PERMISSION_DENIED`: use the intended backend database role with table write access
+  and RLS access. Browser anon/authenticated roles have no policies in these migrations.
+- `DATABASE_UNAVAILABLE`: inspect `error_type` and `sqlstate` in backend logs for connection,
+  pool, or other database failures.
+
+Keep RLS enabled. The frontend calls the API; it does not need direct database write policies.
+The API needs the database URI, not a Supabase HTTP API key. A database with empty tables is
+supported and requires no seed session.

@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 
 from app.api.chat import router as chat_router
@@ -74,6 +75,23 @@ async def request_context(request: Request, call_next):
             },
             headers={"Retry-After": "60"},
         )
+    except SQLAlchemyError as exc:
+        logger.exception(
+            "database request failed",
+            extra={"event": "http.request.failed", "request_id": request_id},
+        )
+        sqlstate = getattr(getattr(exc, "orig", None), "sqlstate", None)
+        code, message = "DATABASE_UNAVAILABLE", "Database request failed; check backend logs"
+        if sqlstate in {"42P01", "42703", "3F000"}:
+            code = "DATABASE_SCHEMA_ERROR"
+            message = "Database schema is incomplete; apply migrations to the API database"
+        elif sqlstate == "42501":
+            code = "DATABASE_PERMISSION_DENIED"
+            message = "Backend database role cannot access the application tables"
+        response = JSONResponse(
+            status_code=503,
+            content={"code": code, "message": message, "request_id": request_id},
+        )
     except Exception:
         logger.exception(
             "request failed", extra={"event": "http.request.failed", "request_id": request_id}
@@ -106,6 +124,7 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Idempotency-Key", "X-Request-ID"],
 )
+
 
 @app.exception_handler(HTTPException)
 async def http_error(request: Request, exc: HTTPException):

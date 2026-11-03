@@ -207,3 +207,63 @@ def test_cors_headers_on_middleware_error(client, monkeypatch):
     assert response.json()["code"] == "INTERNAL_ERROR"
     assert response.headers["access-control-allow-origin"] == origin
     assert response.headers["access-control-allow-credentials"] == "true"
+
+
+def test_readiness_probes_leave_database_empty(client):
+    from sqlalchemy import func
+
+    from app.models import AnonymousSession
+    from app.models.chat import LimitBucket
+
+    assert client.get("/ready").status_code == 200
+    with app.state.session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(AnonymousSession)) == 0
+        assert db.scalar(select(func.count()).select_from(LimitBucket)) == 0
+    origin = get_settings().frontend_origins[0]
+    first = client.post("/api/v1/anonymous-session", headers={"origin": origin})
+    assert first.status_code == 200
+    assert first.json()["id"]
+    assert "httponly" in first.headers["set-cookie"].lower()
+    second = client.post("/api/v1/anonymous-session", headers={"origin": origin})
+    assert second.status_code == 200
+    assert second.json()["id"] == first.json()["id"]
+
+
+def test_readiness_rejects_incomplete_migrations(client):
+    from sqlalchemy import text
+
+    with app.state.session_factory() as db:
+        db.execute(text("ALTER TABLE anonymous_sessions DROP COLUMN expires_at"))
+        db.commit()
+    assert client.get("/ready").status_code == 503
+
+
+@pytest.mark.parametrize(
+    ("sqlstate", "code"),
+    [
+        ("42P01", "DATABASE_SCHEMA_ERROR"),
+        ("42703", "DATABASE_SCHEMA_ERROR"),
+        ("42501", "DATABASE_PERMISSION_DENIED"),
+        ("08006", "DATABASE_UNAVAILABLE"),
+    ],
+)
+def test_database_failure_is_actionable_and_has_cors(client, monkeypatch, sqlstate, code):
+    from sqlalchemy.exc import DBAPIError
+
+    class DatabaseFailure(Exception):
+        pass
+
+    original = DatabaseFailure("private database details")
+    original.sqlstate = sqlstate
+
+    def unavailable_db():
+        raise DBAPIError("private SQL", {"secret": "private parameter"}, original)
+
+    monkeypatch.setattr(app.state, "session_factory", unavailable_db)
+    origin = get_settings().frontend_origins[0]
+    response = client.post("/api/v1/anonymous-session", headers={"origin": origin})
+    assert response.status_code == 503
+    assert response.json()["code"] == code
+    assert response.json()["request_id"] == response.headers["x-request-id"]
+    assert response.headers["access-control-allow-origin"] == origin
+    assert "private" not in response.text
