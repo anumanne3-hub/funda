@@ -1,43 +1,62 @@
-# Milestone 1 tracker — v0.1.0
+﻿# Milestone 1 tracker — v0.1.0
 
-Status values: `[x]` done, `[~]` in progress, `[ ]` pending, `[!]` blocked.
+Updated 2026-11-02. `[x]` implemented and locally verified; `[~]` implemented with external
+verification pending; `[ ]` not completed. Do not equate a deployment template with a live deployment.
 
-1. [x] Define the Milestone 1 execution order and acceptance gates.
-2. [x] Add frontend and backend project structure, environment templates, and ignore rules.
-3. [x] Add FastAPI application configuration, structured logging, request IDs, `/health`, and `/ready`.
-4. [x] Define a versioned WebSocket chat protocol and mock token streaming.
-5. [x] Build a simple responsive React chat UI with empty, connecting, streaming, error, and retry states.
-6. [~] Install and lock current dependencies; run lint, type checks, tests, and production builds.
-   - Backend dependencies are installed; Ruff passes and both health/WebSocket tests pass.
-   - A reproducible Python lockfile is still pending.
-   - Frontend source is pinned to React 19.3 and Vite 8.3.5; Node.js/npm are not installed locally.
-7. [ ] Add local PostgreSQL, SQLAlchemy session management, and Alembic.
-8. [ ] Create migration `0001_initial_chat` with anonymous sessions, conversations, messages, and chat requests.
-9. [ ] Implement opaque anonymous-session cookies and ownership-scoped conversation queries.
-10. [ ] Implement HTTP conversation create/list/detail endpoints with cursor pagination.
-11. [ ] Persist user messages and pending/completed/failed assistant requests transactionally.
-12. [ ] Enforce `Idempotency-Key` so retries do not duplicate turns or provider calls.
-13. [ ] Replace mock-only generation with a provider adapter plus one real LLM provider.
-14. [ ] Add provider timeout, rate-limit, token-limit, usage/cost metadata, and controlled retry behavior.
-15. [ ] Connect the UI to persisted conversations and reconcile WebSocket reconnect/retry behavior.
-16. [ ] Add database, ownership, validation, timeout, idempotency, WebSocket, and UI tests.
-17. [ ] Add CI for formatting, linting, type checks, tests, builds, dependency audit, and secret scanning.
-18. [ ] Create Supabase, Render, and Vercel environments; configure secrets, cookies, CORS, and migration command.
-19. [ ] Run public smoke tests for isolation, chat, reload persistence, restart persistence, and secret exposure.
-20. [ ] Tag `v0.1.0` only after every acceptance criterion passes.
+1. [x] Execution order and acceptance gates.
+2. [x] Frontend/backend structure, environment examples and ignore rules.
+3. [x] FastAPI settings, structured logs, request IDs, safe errors, health and database readiness.
+4. [x] Versioned WebSocket protocol and deterministic mock streaming.
+5. [x] Responsive chat, conversation navigation, empty/loading/error/disabled/retry states.
+6. [x] Python uv.lock, npm package-lock.json, formatting, lint, type checks, production build and audits.
+7. [x] PostgreSQL Compose configuration, SQLAlchemy sessions and Alembic; portable PostgreSQL tested locally.
+8. [x] Initial schema migration plus 0002_limits_and_cost; PostgreSQL upgrade/check/downgrade/upgrade verified.
+9. [x] Opaque anonymous cookies, hashed tokens, ownership-scoped HTTP/WebSocket access and origin checks.
+10. [x] Conversation create/list/detail with composite cursor ordering and frontend load-more controls.
+11. [x] Transactional message/request states and persisted streamed results.
+12. [x] Idempotency keys, payload-conflict checks and concurrent duplicate-request locking.
+13. [~] Mock, OpenAI-compatible and native Gemini adapters. Mock transport contract tests pass;
+    live Gemini key/model verification still needs the user's free-tier API key.
+14. [x] Provider total timeout/output limit, usage/cost metadata, durable IP/session limits,
+    daily request caps, conservative paid budget reservations and no automatic duplicate provider calls.
+15. [x] Persisted UI history, original-key retry/reconnect, reload reconciliation and stale-request handling.
+16. [x] Backend tests for migrations, ownership, invalid input, provider errors, rate/budget limits,
+    idempotency and concurrency. Browser tests cover isolation, reload, interrupted streaming and mobile UI.
+17. [~] CI and public smoke workflows implemented; local checks pass. Hosted GitHub Actions result
+    on the final commit still needs verification.
+18. [~] Supabase/Render/Vercel deployment instructions, Render blueprint and Vercel config are ready.
+    User has existing projects; their URLs, connected access and deployment secrets are still needed.
+19. [~] Local browser and API/database restart checks pass; public hosted smoke and production
+    cookie/domain behavior remain unverified.
+20. [ ] Tag v0.1.0 only after all hosted acceptance criteria pass.
 
-## Current local blockers
+## Recorded local verification
 
-- Install Node.js supported by Vite 8, then generate `package-lock.json` and verify the frontend.
-- Install Docker Desktop or provide another local PostgreSQL instance for database work.
-- Install backend dependencies before running pytest and the API.
+- PostgreSQL 18: 23 backend tests passed, including concurrent duplicate requests.
+- SQLite suite: 21 passed and the PostgreSQL concurrency case skipped before adding the Gemini
+  adapter test; the final full check is recorded below when rerun.
+- Real PostgreSQL migrations: upgrade, schema drift check, downgrade and re-upgrade passed.
+- API and workspace PostgreSQL restart: committed history and duplicate-free retry preserved.
+- Frontend: production build, TypeScript and ESLint passed.
+- Chromium: 3 browser tests passed; the first Windows sandbox run needed helper-process cleanup.
+- Python/npm dependency audits: no known vulnerabilities reported.
+- Source and built-asset secret-pattern scans passed. This is a targeted pattern scan, not a proof
+  that arbitrary secrets cannot exist; hosted environment and log checks remain part of release.
 
-## Milestone acceptance gate
+## External release inputs still needed
 
-- Public frontend, `/health`, and `/ready` are reachable.
+- Existing Supabase project URL, Render service URL and Vercel frontend URL / connected access.
+- PostgreSQL runtime/migration secrets and exact frontend origin on Render.
+- Google AI Studio key on a free-tier project. The chosen initial model is gemini-3.1-flash-lite;
+  there is no paid fallback. See docs/deployment.md for the exact settings and data-use note.
+- Successful hosted CI and public smoke run against the final deployment, then the release tag.
+
+## Acceptance gate
+
+- Public frontend, health and readiness are reachable.
 - Two browser sessions cannot see each other's data.
-- A visitor can send a message, receive streamed output, reload, and recover history.
-- Retrying a request does not duplicate a message or LLM charge.
-- Data survives API and database client restarts.
-- Provider failures are controlled and the API stays healthy.
-- No secret appears in source control, browser assets, API errors, or logs.
+- A visitor can send a message, receive streamed output, reload and recover history.
+- Replaying a request does not duplicate a message or provider operation.
+- API/database restarts preserve data.
+- Provider errors are controlled and leave the API healthy.
+- Secrets are absent from source, frontend assets, error responses and logs.

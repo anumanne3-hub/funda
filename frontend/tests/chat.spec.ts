@@ -52,7 +52,9 @@ test("mobile composer stays within the viewport", async ({ page }) => {
   const box = await page.getByLabel("Message", { exact: true }).boundingBox();
   await expect(page.getByLabel("Choose conversation")).toBeVisible();
   await page.getByRole("button", { name: "New chat", exact: true }).click();
-  await expect(page.getByLabel("Choose conversation").locator("option")).toHaveCount(2);
+  await expect(
+    page.getByLabel("Choose conversation").locator("option"),
+  ).toHaveCount(2);
   expect(box).not.toBeNull();
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   await page.screenshot({ path: "test-results/mobile.png", fullPage: true });

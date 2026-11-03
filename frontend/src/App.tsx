@@ -336,13 +336,23 @@ export function App() {
             <h1>{active?.title ?? "Starting chat…"}</h1>
             <p>Private anonymous session</p>
             <div className="mobile-conversations">
-              <select aria-label="Choose conversation" value={activeId ?? ""}
-                onChange={(event) => setActiveId(event.target.value)}>
-                {conversations.map((conversation) => <option key={conversation.id}
-                  value={conversation.id}>{conversation.title}</option>)}
+              <select
+                aria-label="Choose conversation"
+                value={activeId ?? ""}
+                onChange={(event) => setActiveId(event.target.value)}
+              >
+                {conversations.map((conversation) => (
+                  <option key={conversation.id} value={conversation.id}>
+                    {conversation.title}
+                  </option>
+                ))}
               </select>
-              <button type="button" onClick={() => void newChat()}>New chat</button>
-              {nextCursor && <button onClick={() => void loadMore()}>More</button>}
+              <button type="button" onClick={() => void newChat()}>
+                New chat
+              </button>
+              {nextCursor && (
+                <button onClick={() => void loadMore()}>More</button>
+              )}
             </div>
           </div>
           <span className={`status ${connection}`} role="status">
