@@ -1,12 +1,32 @@
 import { test, expect } from "@playwright/test";
 
+test("help explains API calls and database columns", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open help" }).click();
+  await expect(
+    page.getByRole("heading", { name: "API details" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Request data and purpose").first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "DB details" }).click();
+  await expect(page.getByRole("heading", { name: "DB details" })).toBeVisible();
+  await expect(
+    page.getByRole("columnheader", { name: "Generated from" }).first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await expect(page.getByRole("button", { name: "Open help" })).toBeVisible();
+});
+
 test("chat survives reload and stays isolated between browser sessions", async ({
   page,
   browser,
 }) => {
   await page.goto("/");
   await expect(page).toHaveTitle("Funda");
-  await expect(page.locator(".header-brand")).toHaveText("Funda");
+  await expect(page.locator(".header-brand > span:first-child")).toHaveText(
+    "Funda",
+  );
   await expect(page.locator(".header-account")).toHaveText("Guest");
   await expect(page.getByRole("status")).toHaveText("Connected");
   await page.getByRole("button", { name: "User menu: Guest" }).click();
@@ -55,7 +75,9 @@ test("reload during a stream reuses its original request", async ({ page }) => {
 test("mobile composer stays within the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.locator(".header-brand")).toHaveText("Funda");
+  await expect(page.locator(".header-brand > span:first-child")).toHaveText(
+    "Funda",
+  );
   await expect(page.locator(".header-account")).toHaveText("Guest");
   await expect(page.getByRole("status")).toHaveText("Connected");
   await page.getByRole("button", { name: "User menu: Guest" }).click();
@@ -64,15 +86,12 @@ test("mobile composer stays within the viewport", async ({ page }) => {
     .getByRole("button", { name: "Log in" })
     .click();
   await expect(page.getByLabel("Email")).toBeVisible();
-  await page.getByRole("button", { name: "Close menu" }).click();
+  await page.getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Log in" })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Create account" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByLabel("Password")).toBeVisible();
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Close menu" }).click();
   await expect(
     page.getByRole("button", { name: "Menu", exact: true }),
@@ -107,7 +126,8 @@ test("desktop sidebar uses 40% width and scrolls independently", async ({
   await expect(sidebar).toBeVisible();
   const box = await sidebar.boundingBox();
   expect(box?.width).toBe(400);
-  await sidebar.evaluate((element) => {
+  const conversationList = page.locator(".conversation-list");
+  await conversationList.evaluate((element) => {
     for (let i = 0; i < 30; i += 1) {
       const item = document.createElement("div");
       item.textContent = `Conversation ${i}`;
@@ -117,8 +137,11 @@ test("desktop sidebar uses 40% width and scrolls independently", async ({
     element.scrollTop = element.scrollHeight;
   });
   expect(
-    await sidebar.evaluate((element) => element.scrollTop),
+    await conversationList.evaluate((element) => element.scrollTop),
   ).toBeGreaterThan(0);
+  expect(
+    await sidebar.evaluate((element) => getComputedStyle(element).overflowY),
+  ).toBe("clip");
   expect(
     await page.locator(".messages").evaluate((element) => element.scrollTop),
   ).toBe(0);
@@ -157,7 +180,11 @@ test("account can claim an anonymous chat and organize it", async ({
 }) => {
   await page.goto("/");
   await expect(page.getByRole("status")).toHaveText("Connected");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "User menu: Guest" }).click();
+  await page
+    .locator(".profile-dropdown")
+    .getByRole("button", { name: "Create account" })
+    .click();
   const email = `user-${Date.now()}@example.com`;
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("a-long-test-password");
@@ -184,7 +211,11 @@ test("account can edit, restore, regenerate and rate a reply", async ({
 }) => {
   await page.goto("/");
   await expect(page.getByRole("status")).toHaveText("Connected");
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "User menu: Guest" }).click();
+  await page
+    .locator(".profile-dropdown")
+    .getByRole("button", { name: "Create account" })
+    .click();
   await page.getByLabel("Email").fill(`editor-${Date.now()}@example.com`);
   await page.getByLabel("Password").fill("a-long-test-password");
   await page.getByRole("button", { name: "Continue" }).click();
@@ -200,7 +231,7 @@ test("account can edit, restore, regenerate and rate a reply", async ({
   );
   await expect(page.getByLabel("Streaming response")).toHaveCount(0);
   page.once("dialog", (dialog) => void dialog.accept("Edited prompt"));
-  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(page.locator(".message.user p")).toHaveText("Edited prompt");
   await page.getByRole("button", { name: "Versions" }).click();
   await page.getByRole("button", { name: "Restore v1" }).click();

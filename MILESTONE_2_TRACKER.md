@@ -1,7 +1,30 @@
 # Milestone 2 tracker — v0.2.0
 
-Updated 2026-11-03. The frontend is deployed at https://funda-geni.vercel.app/;
-v0.2.0 acceptance testing and release are still pending.
+Updated 2026-11-04. The application URL is https://funda-geni.vercel.app/.
+The user has manually tested the deployed site and reports that it appears to
+work. The exact flows covered by that check are not recorded, so the specific
+Milestone 2 release gates below remain open.
+
+## 2026-11-04 completion attempt
+
+- Re-ran the local backend suite: 38 passed, 3 PostgreSQL-only tests skipped.
+  Ruff check, Ruff format check, and mypy passed.
+- The current GitHub commit is `d4014ef4d8677161f30b5d43557b4bfd709cd79c`.
+  Its Vercel `funda-geni` status is successful; a separate Vercel `funda`
+  status is failing. The available GitHub workflow lookup returned no PR runs
+  for this commit, so final CI could not be confirmed.
+- Hosted frontend/API requests from this workspace could not connect. Hosted
+  account chat, regeneration, feedback, deletion, provider behavior, and
+  cross-account isolation therefore remain unverified for the current build.
+- Current local Help UI changes are uncommitted. With the repository's bundled
+  Node v26.13.0 added to PATH, the frontend TypeScript and Vite production build
+  passed on 2026-11-04.
+- Frontend formatting and lint passed after the UI test updates. The local
+  Chromium flows passed when run with installed Chrome; Playwright's Windows
+  helper hangs during server cleanup, so a clean full-suite exit remains
+  unconfirmed.
+- Milestone 2 remains **acceptance pending**. Do not tag v0.2.0 until hosted
+  verification, final CI, and the retention/deletion checks below pass.
 
 ## Implemented locally
 

@@ -63,11 +63,14 @@ button:disabled {
   flex-direction: column;
   min-height: 0;
   padding: 22px 16px;
-  overflow: hidden;
+  overflow: clip;
   overscroll-behavior-y: contain;
   color: var(--text);
   background: var(--background);
   border-right: 1px solid var(--border);
+}
+.sidebar > :not(.conversation-list) {
+  flex-shrink: 0;
 }
 .brand {
   display: flex;
@@ -244,7 +247,7 @@ button:disabled {
   background: var(--primary);
 }
 .sidebar-footer {
-  margin-top: auto;
+  margin-top: 0;
   padding: 16px 8px 0;
   color: var(--muted);
   font-size: 12px;
@@ -297,26 +300,173 @@ button:disabled {
   font-size: 15px;
   font-weight: 700;
 }
-.help-trigger:hover { border-color: var(--accent); color: var(--accent); }
-.help-page { height: 100dvh; overflow: hidden; background: var(--background); }
-.help-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
-.help-header button, .help-nav button { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
-.help-header button:hover, .help-nav button:hover, .help-nav button.active { border-color: var(--accent); color: var(--accent); }
-.help-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: calc(100dvh - 66px); }
-.help-nav { display: grid; align-content: start; gap: 8px; padding: 20px; border-right: 1px solid var(--border); }
-.help-nav button { text-align: left; }
-.help-content { min-width: 0; overflow-y: auto; padding: 24px clamp(20px, 4vw, 60px) 60px; }
-.help-content h1 { margin: 0 0 12px; }
-.help-content > p { max-width: 900px; color: var(--muted); line-height: 1.6; }
-.help-cards { display: grid; gap: 12px; margin: 24px 0; }
-.help-card { padding: 16px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
-.help-card h2 { margin: 0 0 12px; font-size: 16px; overflow-wrap: anywhere; }
-.help-card p { margin: 8px 0; line-height: 1.5; overflow-wrap: anywhere; }
-.help-card code { color: var(--accent); }
+.help-trigger:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.help-page {
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--background);
+}
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.help-header button,
+.help-nav button {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+.help-header button:hover,
+.help-nav button:hover,
+.help-nav button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.help-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  height: calc(100dvh - 66px);
+}
+.help-nav {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 20px;
+  border-right: 1px solid var(--border);
+}
+.help-nav button {
+  text-align: left;
+}
+.help-content {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 24px clamp(20px, 4vw, 60px) 60px;
+}
+.help-content h1 {
+  margin: 0 0 12px;
+}
+.help-content > p {
+  max-width: 900px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.help-cards {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+.help-card {
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.help-card h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.help-card p {
+  margin: 8px 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.help-card h3 {
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: var(--accent);
+}
+.help-card ul {
+  margin: 0;
+  padding-left: 22px;
+}
+.help-card li {
+  margin: 7px 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.help-card code {
+  color: var(--accent);
+}
+.rag-section {
+  margin-top: 16px;
+}
+.rag-flow {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.rag-flow > div {
+  flex: 1 1 150px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+}
+.rag-flow strong,
+.rag-flow div span {
+  display: block;
+}
+.rag-flow div span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.rag-arrow {
+  align-self: center;
+  color: var(--accent);
+}
+.help-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+.help-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+.help-data-table th,
+.help-data-table td {
+  min-width: 150px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.45;
+}
+.help-data-table th:first-child {
+  min-width: 170px;
+}
+.help-data-table thead th {
+  color: var(--muted);
+  font-weight: 600;
+}
 @media (max-width: 640px) {
-  .help-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
-  .help-nav { display: flex; padding: 12px; border-right: 0; border-bottom: 1px solid var(--border); }
-  .help-content { padding: 20px; }
+  .help-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .help-nav {
+    display: flex;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .help-content {
+    padding: 20px;
+  }
 }
 .brand-live-dot {
   width: 8px;

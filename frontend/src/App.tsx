@@ -659,10 +659,10 @@ export function App() {
         </div>
         {account && (
           <div className="account-controls">
-              <span>{account.email}</span>
-              <button type="button" onClick={() => void handleClaim()}>
-                Claim anonymous chats
-              </button>
+            <span>{account.email}</span>
+            <button type="button" onClick={() => void handleClaim()}>
+              Claim anonymous chats
+            </button>
           </div>
         )}
         {account && (
@@ -704,38 +704,76 @@ export function App() {
         </button>
         <p className="section-label">Recent</p>
         <div className="conversation-list" aria-label="Recent conversations">
-        {conversations.map((conversation) => (
-          <button
-            className={`conversation ${conversation.id === activeId ? "active" : ""}`}
-            key={conversation.id}
-            type="button"
-            onClick={() => {
-              setActiveId(conversation.id);
-              setMobileNavOpen(false);
-            }}
-          >
-            {conversation.title}
-          </button>
-        ))}
-        {nextCursor && (
-          <button onClick={() => void loadMore()}>
-            Load more conversations
-          </button>
-        )}
+          {conversations.map((conversation) => (
+            <button
+              className={`conversation ${conversation.id === activeId ? "active" : ""}`}
+              key={conversation.id}
+              type="button"
+              onClick={() => {
+                setActiveId(conversation.id);
+                setMobileNavOpen(false);
+              }}
+            >
+              {conversation.title}
+            </button>
+          ))}
+          {nextCursor && (
+            <button onClick={() => void loadMore()}>
+              Load more conversations
+            </button>
+          )}
         </div>
         <div className="sidebar-footer">
           {account ? "Private account chat" : "Private anonymous chat"}
         </div>
       </aside>
       {authMode && (
-        <div className="auth-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuthMode(null); }} onKeyDown={(event) => { if (event.key === "Escape") setAuthMode(null); }}>
-          <div className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-            <form className="auth-form" onSubmit={(event) => void submitAuth(event)}>
-              <h2 id="auth-title">{authMode === "login" ? "Log in" : "Create account"}</h2>
-              <label>Email<input autoFocus type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-              <label>Password<input type="password" required minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        <div
+          className="auth-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setAuthMode(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setAuthMode(null);
+          }}
+        >
+          <div
+            className="auth-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="auth-title"
+          >
+            <form
+              className="auth-form"
+              onSubmit={(event) => void submitAuth(event)}
+            >
+              <h2 id="auth-title">
+                {authMode === "login" ? "Log in" : "Create account"}
+              </h2>
+              <label>
+                Email
+                <input
+                  autoFocus
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  required
+                  minLength={12}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </label>
               <button type="submit">Continue</button>
-              <button type="button" onClick={() => setAuthMode(null)}>Cancel</button>
+              <button type="button" onClick={() => setAuthMode(null)}>
+                Cancel
+              </button>
             </form>
           </div>
         </div>
@@ -745,7 +783,15 @@ export function App() {
           <div className="header-topbar">
             <div className="header-brand">
               <span>Funda</span>
-              <button className="help-trigger" type="button" aria-label="Open help" title="Help" onClick={() => setHelpOpen(true)}>?</button>
+              <button
+                className="help-trigger"
+                type="button"
+                aria-label="Open help"
+                title="Help"
+                onClick={() => setHelpOpen(true)}
+              >
+                ?
+              </button>
               <span className="brand-live-dot" aria-hidden="true" />
             </div>
             <div className="profile-menu" ref={profileMenuRef}>
@@ -795,13 +841,33 @@ export function App() {
                       >
                         Log out everywhere
                       </button>
-                      <button type="button" onClick={() => { setProfileMenuOpen(false); void handleDiscard(); }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          void handleDiscard();
+                        }}
+                      >
                         Discard anonymous chats
                       </button>
-                      {selectedProject && <button type="button" onClick={() => { setProfileMenuOpen(false); void handleDeleteProject(); }}>
-                        Delete project
-                      </button>}
-                      <button type="button" onClick={() => { setProfileMenuOpen(false); void handleDeleteAccount(); }}>
+                      {selectedProject && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfileMenuOpen(false);
+                            void handleDeleteProject();
+                          }}
+                        >
+                          Delete project
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          void handleDeleteAccount();
+                        }}
+                      >
                         Delete account
                       </button>
                     </>
