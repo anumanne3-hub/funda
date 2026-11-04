@@ -1,6 +1,7 @@
 # Milestone 2 tracker — v0.2.0
 
-Updated 2026-11-03. Local implementation is in progress; v0.2.0 is not released or deployed.
+Updated 2026-11-03. The frontend is deployed at https://funda-geni.vercel.app/;
+v0.2.0 acceptance testing and release are still pending.
 
 ## Implemented locally
 
@@ -22,6 +23,20 @@ Updated 2026-11-03. Local implementation is in progress; v0.2.0 is not released 
 
 ## Verification so far
 
+- The deployed frontend returned HTTP 200 with the Funda title. The configured API
+  returned `ready` with `database: ok`. Public smoke passed health, streaming,
+  idempotent retry, and anonymous-session isolation against the hosted API.
+- Hosted account, project, message-version, regeneration, and deletion flows have
+  not yet been run end to end against disposable production accounts.
+- Hosted disposable-account checks verified registration, CSRF, anonymous claim,
+  project create/rename, conversation create/rename, and cross-account ownership.
+  Account chat then returned `PROVIDER_UNAVAILABLE`; a second attempt lost its
+  WebSocket connection before `connection.ready`. The first pair of test accounts
+  was deleted. Cleanup of the second pair failed during a connection reset, so
+  two accounts with the `funda-release-check-` email prefix may remain in the
+  hosted database and need an administrator cleanup. Message versions, feedback,
+  and regeneration remain unverified on the hosted service.
+
 - Backend: 38 SQLite tests passed (three PostgreSQL-only tests skipped).
 - Backend: 41 PostgreSQL tests passed on an empty disposable `funda_test_m2` database,
   including SQL migration/model compatibility, ownership and regeneration replay.
@@ -35,7 +50,7 @@ Updated 2026-11-03. Local implementation is in progress; v0.2.0 is not released 
 
 ## Remaining release gates
 
-- Run hosted CI and public smoke on the final commit.
+- Run hosted CI on the final commit and repeat public smoke after any deployment change.
 - Apply the SQL migrations to a staging/production database before rolling out API code;
   verify hosted account and project isolation with two real accounts. No remote schema or
   deployment has been changed by this work.

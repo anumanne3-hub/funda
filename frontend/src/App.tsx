@@ -34,6 +34,7 @@ import type {
 } from "./api/client";
 import { websocketUrl } from "./api/chatSocket";
 import type { ConnectionState, ServerEvent } from "./api/chatSocket";
+import { HelpPage } from "./HelpPage";
 
 type Pending = {
   type: "chat.send";
@@ -69,6 +70,7 @@ export function App() {
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -627,6 +629,7 @@ export function App() {
     Boolean(activeId) &&
     !busy &&
     !canRetry;
+  if (helpOpen) return <HelpPage onClose={() => setHelpOpen(false)} />;
   return (
     <main className="app-shell">
       {mobileNavOpen && (
@@ -654,67 +657,13 @@ export function App() {
             ×
           </button>
         </div>
-        <div className="account-controls">
-          {account ? (
-            <>
+        {account && (
+          <div className="account-controls">
               <span>{account.email}</span>
               <button type="button" onClick={() => void handleClaim()}>
                 Claim anonymous chats
               </button>
-              <button type="button" onClick={() => void handleDiscard()}>
-                Discard anonymous chats
-              </button>
-              <button type="button" onClick={() => void handleLogout()}>
-                Log out
-              </button>
-              <button type="button" onClick={() => void handleLogoutAll()}>
-                Log out everywhere
-              </button>
-              <button type="button" onClick={() => void handleDeleteAccount()}>
-                Delete account
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={() => setAuthMode("login")}>
-                Log in
-              </button>
-              <button type="button" onClick={() => setAuthMode("register")}>
-                Create account
-              </button>
-            </>
-          )}
-        </div>
-        {authMode && (
-          <form
-            className="auth-form"
-            onSubmit={(event) => void submitAuth(event)}
-          >
-            <h2>{authMode === "login" ? "Log in" : "Create account"}</h2>
-            <label>
-              Email
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                required
-                minLength={12}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </label>
-            <button type="submit">Continue</button>
-            <button type="button" onClick={() => setAuthMode(null)}>
-              Cancel
-            </button>
-          </form>
+          </div>
         )}
         {account && (
           <div className="project-controls">
@@ -742,12 +691,6 @@ export function App() {
                 >
                   Rename project
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDeleteProject()}
-                >
-                  Delete project
-                </button>
               </>
             )}
           </div>
@@ -760,6 +703,7 @@ export function App() {
           + New conversation
         </button>
         <p className="section-label">Recent</p>
+        <div className="conversation-list" aria-label="Recent conversations">
         {conversations.map((conversation) => (
           <button
             className={`conversation ${conversation.id === activeId ? "active" : ""}`}
@@ -778,15 +722,30 @@ export function App() {
             Load more conversations
           </button>
         )}
+        </div>
         <div className="sidebar-footer">
           {account ? "Private account chat" : "Private anonymous chat"}
         </div>
       </aside>
+      {authMode && (
+        <div className="auth-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuthMode(null); }} onKeyDown={(event) => { if (event.key === "Escape") setAuthMode(null); }}>
+          <div className="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <form className="auth-form" onSubmit={(event) => void submitAuth(event)}>
+              <h2 id="auth-title">{authMode === "login" ? "Log in" : "Create account"}</h2>
+              <label>Email<input autoFocus type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+              <label>Password<input type="password" required minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+              <button type="submit">Continue</button>
+              <button type="button" onClick={() => setAuthMode(null)}>Cancel</button>
+            </form>
+          </div>
+        </div>
+      )}
       <section className="chat-panel">
         <header className="chat-header">
           <div className="header-topbar">
             <div className="header-brand">
               <span>Funda</span>
+              <button className="help-trigger" type="button" aria-label="Open help" title="Help" onClick={() => setHelpOpen(true)}>?</button>
               <span className="brand-live-dot" aria-hidden="true" />
             </div>
             <div className="profile-menu" ref={profileMenuRef}>
@@ -836,6 +795,15 @@ export function App() {
                       >
                         Log out everywhere
                       </button>
+                      <button type="button" onClick={() => { setProfileMenuOpen(false); void handleDiscard(); }}>
+                        Discard anonymous chats
+                      </button>
+                      {selectedProject && <button type="button" onClick={() => { setProfileMenuOpen(false); void handleDeleteProject(); }}>
+                        Delete project
+                      </button>}
+                      <button type="button" onClick={() => { setProfileMenuOpen(false); void handleDeleteAccount(); }}>
+                        Delete account
+                      </button>
                     </>
                   ) : (
                     <>
@@ -844,7 +812,7 @@ export function App() {
                         onClick={() => {
                           setProfileMenuOpen(false);
                           setAuthMode("login");
-                          setMobileNavOpen(true);
+                          setMobileNavOpen(false);
                         }}
                       >
                         Log in
@@ -854,7 +822,7 @@ export function App() {
                         onClick={() => {
                           setProfileMenuOpen(false);
                           setAuthMode("register");
-                          setMobileNavOpen(true);
+                          setMobileNavOpen(false);
                         }}
                       >
                         Create account

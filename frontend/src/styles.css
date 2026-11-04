@@ -63,7 +63,7 @@ button:disabled {
   flex-direction: column;
   min-height: 0;
   padding: 22px 16px;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior-y: contain;
   color: var(--text);
   background: var(--background);
@@ -208,12 +208,37 @@ button:disabled {
   letter-spacing: 0.08em;
 }
 .conversation {
+  display: block;
+  width: 100%;
   padding: 11px 12px;
   color: var(--text);
   text-align: left;
   border: 0;
   border-radius: 9px;
   background: transparent;
+}
+.conversation-list {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.7);
+}
+.auth-dialog {
+  width: min(100%, 400px);
+}
+.auth-dialog .auth-form {
+  margin: 0;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 .conversation.active {
   background: var(--primary);
@@ -258,6 +283,40 @@ button:disabled {
   font-size: 23px;
   font-weight: 800;
   letter-spacing: -0.03em;
+}
+.help-trigger {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+.help-trigger:hover { border-color: var(--accent); color: var(--accent); }
+.help-page { height: 100dvh; overflow: hidden; background: var(--background); }
+.help-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+.help-header button, .help-nav button { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.help-header button:hover, .help-nav button:hover, .help-nav button.active { border-color: var(--accent); color: var(--accent); }
+.help-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); height: calc(100dvh - 66px); }
+.help-nav { display: grid; align-content: start; gap: 8px; padding: 20px; border-right: 1px solid var(--border); }
+.help-nav button { text-align: left; }
+.help-content { min-width: 0; overflow-y: auto; padding: 24px clamp(20px, 4vw, 60px) 60px; }
+.help-content h1 { margin: 0 0 12px; }
+.help-content > p { max-width: 900px; color: var(--muted); line-height: 1.6; }
+.help-cards { display: grid; gap: 12px; margin: 24px 0; }
+.help-card { padding: 16px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.help-card h2 { margin: 0 0 12px; font-size: 16px; overflow-wrap: anywhere; }
+.help-card p { margin: 8px 0; line-height: 1.5; overflow-wrap: anywhere; }
+.help-card code { color: var(--accent); }
+@media (max-width: 640px) {
+  .help-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .help-nav { display: flex; padding: 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .help-content { padding: 20px; }
 }
 .brand-live-dot {
   width: 8px;

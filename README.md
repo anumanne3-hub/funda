@@ -4,9 +4,10 @@ Milestone 1 implements anonymous, isolated, persistent streaming chat with React
 PostgreSQL and a mock / Gemini / OpenAI-compatible provider. See [status](MILESTONE_1_TRACKER.md),
 [architecture and API](docs/architecture.md), and [deployment](docs/deployment.md).
 
-Milestone 2 account, project, conversation-control, and message-version work is underway.
+Milestone 2 account, project, conversation-control, and message-version work is deployed
+for testing at https://funda-geni.vercel.app/, but full hosted acceptance is pending.
 See [Milestone 2 status](MILESTONE_2_TRACKER.md). Its SQL migrations must be applied before
-running this branch's API against PostgreSQL. The hosted v0.1.0 release remains unchanged.
+running this branch's API against PostgreSQL.
 
 ## Local setup
 
