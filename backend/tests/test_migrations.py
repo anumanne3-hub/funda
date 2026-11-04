@@ -50,7 +50,10 @@ def test_postgres_sql_migrations_preserve_data_and_match_models():
             schema = inspect(connection)
             for table in Base.metadata.sorted_tables:
                 columns = {column["name"]: column for column in schema.get_columns(table.name)}
-                assert set(columns) == set(table.columns.keys())
+                expected_columns = set(table.columns.keys())
+                if table.name == "document_chunks":
+                    expected_columns.add("embedding")
+                assert set(columns) == expected_columns
                 for column in table.columns:
                     assert columns[column.name]["nullable"] == column.nullable
                     assert str(columns[column.name]["type"].compile(dialect=engine.dialect)) == str(
@@ -66,10 +69,12 @@ def test_postgres_sql_migrations_preserve_data_and_match_models():
                 "SELECT count(*) FROM pg_class WHERE relname IN "
                 "('anonymous_sessions','conversations','messages','chat_requests',"
                 "'limit_buckets','users','account_sessions','projects',"
-                "'message_versions','message_feedback','regeneration_requests') "
+                "'message_versions','message_feedback','regeneration_requests',"
+                "'documents','document_versions','document_chunks','ingestion_jobs',"
+                "'message_citations','storage_deletions') "
                 "AND relnamespace = 'public'::regnamespace "
                 "AND relrowsecurity"
-            ).fetchone() == (11,)
+            ).fetchone() == (17,)
         finally:
             transaction.rollback()
     engine.dispose()

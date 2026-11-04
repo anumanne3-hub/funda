@@ -15,6 +15,7 @@ from app.models import (
     ChatRequest,
     Conversation,
     Message,
+    MessageCitation,
     MessageFeedback,
     MessageVersion,
     RegenerationRequest,
@@ -33,6 +34,20 @@ class VersionRead(BaseModel):
     version_number: int
     parent_version_id: UUID | None
     content: str
+
+
+class CitationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    ordinal: int
+    document_id: UUID
+    document_version_id: UUID
+    chunk_id: UUID
+    title: str
+    source_url: str | None
+    page: int | None
+    section: str | None
+    start_ms: int | None
+    end_ms: int | None
 
 
 class EditInput(BaseModel):
@@ -94,6 +109,31 @@ def list_versions(
             select(MessageVersion)
             .where(MessageVersion.message_id == message_id)
             .order_by(MessageVersion.version_number)
+        )
+    )
+
+
+@router.get("/messages/{message_id}/citations", response_model=list[CitationRead])
+def list_citations(
+    message_id: UUID, request: Request, db: Session = Depends(get_db)
+) -> list[MessageCitation]:
+    user = account_identity(request, db)
+    message = owned_message(db, user.id, message_id)
+    if message.role != "assistant" or message.status != "completed":
+        return []
+    latest = db.scalar(
+        select(MessageVersion.id)
+        .where(MessageVersion.message_id == message_id)
+        .order_by(MessageVersion.version_number.desc())
+        .limit(1)
+    )
+    if latest is None:
+        return []
+    return list(
+        db.scalars(
+            select(MessageCitation)
+            .where(MessageCitation.message_version_id == latest)
+            .order_by(MessageCitation.ordinal)
         )
     )
 

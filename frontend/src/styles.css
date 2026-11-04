@@ -728,6 +728,65 @@ textarea::placeholder {
   text-align: center;
   font-size: 11px;
 }
+.message-citations {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.rag-sources {
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.rag-sources summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.rag-sources form,
+.rag-upload {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.rag-sources input,
+.rag-sources button {
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+.rag-sources ul {
+  padding-left: 20px;
+}
+.rag-sources li {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.rag-sources li small {
+  display: block;
+  color: var(--muted);
+}
+.rag-sources li button {
+  margin-left: 8px;
+}
+.message-citations ol {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+.message-citations li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.message-citations a {
+  color: var(--accent);
+}
+.citation-location {
+  color: var(--muted);
+}
+
 .empty-state {
   padding: 12vh 20px;
   color: var(--muted);

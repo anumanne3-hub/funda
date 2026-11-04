@@ -158,3 +158,7 @@ Render's `FRONTEND_ORIGINS` to the exact new origin without a trailing slash.
 See the deployment guide for Supabase GitHub migration setup, database connections, production
 cookies/CORS, Vercel configuration and the automated public smoke workflow. Release `v0.1.0`
 remains gated on real-provider, hosted CI and public deployment verification.
+
+Milestone 3 RAG deployment and hosted acceptance steps are in
+[the RAG operations guide](docs/rag-operations.md). Keep `RAG_CHAT_ENABLED=false` until
+those checks pass.

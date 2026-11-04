@@ -1,23 +1,83 @@
 # Milestone 3: Document RAG architecture
 
-Status: implementation started. The RAG contracts and source-aware character chunker
-exist locally; the end-to-end RAG pipeline and the components below remain planned.
+Status: implementation started. RAG contracts, source-aware chunking, and the first
+document/job metadata migration exist locally. The end-to-end RAG pipeline remains planned.
 
 ## Resume here
 
+Pause point (2026-11-04): Next, add bounded PDF extraction when a parser dependency is
+available, then image/audio extraction or provider adapters. Run the disposable PostgreSQL
+suite with pgvector, followed by the hosted checks in `docs/rag-operations.md`. Keep
+`RAG_CHAT_ENABLED=false` until those checks pass. Current local verification: 78 backend
+tests passed, 4 PostgreSQL-only tests skipped; Ruff, mypy, and frontend build/lint/format
+checks passed. All Milestone 3 changes are still uncommitted in this working tree.
+
 - The agreed worker runs as a GitHub Actions workflow, triggered by the backend for
-  manual syncs and chat uploads; scheduled sync is a later addition. Supabase stores
+  manual syncs and chat uploads. A scheduled reconciliation run now scans up to 20 queued
+  or lease-expired jobs every 30 minutes. Supabase stores
   durable jobs, private files, chunks and vectors. NVIDIA trial endpoints are for
   development/evaluation; production model access requires appropriate terms.
 - Existing code: `backend/app/rag/contracts.py` defines scope, source locations,
   evidence and provider interfaces; `backend/app/rag/chunking.py` contains the first
   provenance-preserving chunker. `backend/tests/test_rag_chunking.py` tests it.
-- Next: implement migrations and ownership-scoped document/job APIs, then worker claims,
-  GitHub dispatch, storage and extractors. Do not expose RAG as available until retrieval,
-  citations, authorization and failure paths work end to end.
-- On 2026-11-04 the frontend production build passed; backend tests reported 41 passed,
-  3 PostgreSQL-only tests skipped; Ruff and mypy passed. Hosted acceptance, final CI,
-  and the outstanding Milestone 2 release gates remain unverified.
+- Project website sources can now be registered only when their exact URL is configured in
+  `RAG_ALLOWED_SOURCE_URLS`. Owner-scoped document/job reads, soft deletion and idempotent
+  sync enqueue are implemented. Transactional worker claims, bounded leases, renewals,
+  retries and stale-worker rejection are implemented. A bounded website fetch adapter now
+  validates allowlisted HTTPS URLs and resolved public addresses on each redirect and pins
+  the connection to the validated address. Bounded UTF-8 text, Markdown and HTML extraction
+  is implemented with HTML section provenance. The API can dispatch a committed job to a
+  configured GitHub workflow; failure leaves it queued, and replay can retry dispatch.
+  A one-job worker orchestrator now claims a requested job, bounds processing time and
+  persists completion or sanitized errors. A private Supabase Storage adapter now supports
+  bounded original upload, authenticated download and deletion with version-specific keys.
+  Signed-in users can upload bounded text, Markdown and HTML files to their own conversation;
+  the API stores the original privately and creates an idempotent queued job. Website
+  preparation now combines bounded fetch, extraction, hashing and provenance-preserving
+  chunking, but does not publish an indexed version. The development embedding adapter uses
+  NVIDIA `nemotron-3.5-embed-1b` with validated 2048-dimensional output; a pgvector migration
+  and pgvector-enabled CI database are added. The text ingestion processor handles website
+  sources and conversation uploads, writes vectors and publishes a version in one database
+  transaction. A GitHub Actions workflow runs the worker for a dispatched job. Hosted
+  storage, provider access, PostgreSQL migration and workflow execution remain unverified.
+  Scoped vector retrieval now checks ownership, project/conversation association, deletion,
+  readiness and embedding model in the database query. The PostgreSQL retrieval test is
+  pending a pgvector-enabled test database. A feature-gated chat path builds grounded
+  prompts, handles insufficient evidence, and persists version-specific citations with an
+  owner-scoped read endpoint. The chat UI now loads and displays citation snapshots for
+  completed assistant messages, including after a reload. `RAG_CHAT_ENABLED` remains false
+  by default.
+- The frontend now lets signed-in users register allowed project websites, request syncs,
+  upload text/Markdown/HTML into the active chat, and watch job status. Owner-scoped
+  conversation upload and project/conversation job list endpoints restore documents and
+  their latest job states after reload. Each list is bounded to 100 records; pagination
+  is still needed for larger histories. The production build, lint and formatting checks
+  passed. Fixed citation cases and a PostgreSQL ranking fixture bring backend verification
+  to 78 passed tests
+  (4 PostgreSQL-only skips); Ruff and mypy pass.
+- Scheduled cleanup now removes derived rows for explicitly deleted documents after a
+  one-hour grace period. Private object keys are queued transactionally before document,
+  conversation, project or account rows are deleted, so cascading database deletes preserve
+  the work needed to remove originals. Storage deletion is retryable and treats an already
+  missing object as complete. The new storage-deletion migration needs hosted verification.
+- Citation numbers now start at 1 in saved snapshots, matching answer markers. Fixed
+  cases reject missing, out-of-range and mixed invalid markers. The PostgreSQL fixture
+  asserts ranking order but remains skipped until a pgvector test database is available.
+  Only passages actually cited by an answer are saved, retaining their original marker
+  numbers (for example, a sole `[2]` citation remains source 2 in the UI).
+  These deterministic cases check citation syntax and ordering; they do not measure model
+  factual support on a hosted provider.
+- `docs/rag-operations.md` now records deployment inputs, migration and bucket order,
+  local/CI checks, hosted authorization and failure acceptance, and a feature-flag rollback.
+  None of those hosted checks has been performed yet.
+- Next: add PDF/image/audio extractors, hosted retrieval quality evaluations and hosted
+  acceptance. PDF extraction needs a parser dependency; the package
+  registry was unreachable in this workspace. Do not expose RAG as available until
+  authorization and failure paths work end to end on the hosted stack.
+- On 2026-11-04 backend tests reported 78 passed, 4 PostgreSQL-only tests skipped;
+  Ruff and mypy passed. The citation UI production build, lint and formatting checks passed
+  using the repository's bundled Node runtime. Hosted acceptance, final
+  CI, and the outstanding Milestone 2 release gates remain unverified.
 - These changes and earlier UI/Help changes are uncommitted in the working tree. Preserve
   them when resuming; the architecture document is itself not yet tracked by Git.
 
@@ -96,9 +156,9 @@ Chat question → API / future orchestrator → scoped retrieval → grounded an
   only required secrets, does not print source content or credentials, and operates with
   bounded batches, timeouts, retry limits and failure reporting. Workflow concurrency is
   an optimization; database claims and idempotency are the source of correctness.
-- A schedule can be added after manual sync works. Scheduled reconciliation must recover
-  queued jobs after a failed dispatch or abandoned run. No promise of immediate processing
-  is made with GitHub-hosted runners.
+- Scheduled reconciliation recovers queued jobs after a failed dispatch or abandoned run.
+  Hosted schedule execution is unverified. No promise of immediate processing is made with
+  GitHub-hosted runners.
 - CI uses local fakes for storage, embeddings and extraction; production secrets and trial
   endpoints are not required for tests. Changing an embedding model requires re-indexing.
 

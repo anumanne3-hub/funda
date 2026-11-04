@@ -37,6 +37,17 @@ class Settings(BaseSettings):
     llm_daily_request_limit: int = Field(default=100, ge=1, le=10000)
     requests_per_minute: int = Field(default=20, ge=1)
     sessions_per_minute: int = Field(default=10, ge=1)
+    rag_allowed_source_urls: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    rag_dispatch_repository: str | None = None
+    rag_dispatch_ref: str = "main"
+    rag_dispatch_token: str | None = None
+    rag_storage_url: str | None = None
+    rag_storage_service_key: str | None = None
+    rag_storage_bucket: str = "rag-private"
+    rag_embedding_model: str = "nvidia/nemotron-3.5-embed-1b"
+    rag_embedding_dimensions: Literal[2048] = 2048
+    rag_embedding_api_key: str | None = None
+    rag_chat_enabled: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -56,6 +67,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def production_safety(self) -> "Settings":
+        if self.rag_chat_enabled and (
+            not self.database_url.startswith("postgresql") or not self.rag_embedding_api_key
+        ):
+            raise ValueError("RAG chat requires PostgreSQL and an embedding API key")
         if self.session_cookie_samesite == "none" and not self.session_cookie_secure:
             raise ValueError("SameSite=None requires secure cookies")
         if self.llm_provider != "mock":
@@ -89,6 +104,13 @@ class Settings(BaseSettings):
     def split_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("rag_allowed_source_urls", mode="before")
+    @classmethod
+    def split_source_urls(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [url.strip() for url in value.split(",") if url.strip()]
         return value
 
 

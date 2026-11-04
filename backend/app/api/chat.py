@@ -10,8 +10,13 @@ from pydantic import ValidationError
 
 from app.core.config import get_settings
 from app.core.security import websocket_owner
+from app.models import Conversation
 from app.providers import ProviderError
 from app.providers.llm import Usage
+from app.rag.contracts import RetrievalScope
+from app.rag.embeddings import EmbeddingError, NvidiaEmbeddings
+from app.rag.grounding import grounded_answer
+from app.rag.retrieval import ScopeAccessError, VectorRetrieval
 from app.schemas.chat import ChatSendEvent, ServerEvent
 from app.services.chat import ConversationNotFound, complete_chat, fail_chat, prepare_chat
 from app.services.limits import RequestRejected
@@ -88,6 +93,7 @@ async def process_chat(
     websocket: WebSocket, owner_id: UUID, owner_field: str, event: ChatSendEvent
 ) -> None:
     started = time.perf_counter()
+    settings = get_settings()
     provider = websocket.app.state.llm_provider
     session_factory = websocket.app.state.session_factory
     try:
@@ -188,14 +194,37 @@ async def process_chat(
 
     chunks: list[str] = []
     usage: dict = {}
+    evidence = None
+    cited_ordinals = None
     connected = True
     try:
         async with asyncio.timeout(get_settings().llm_timeout_seconds):
-            async for chunk in provider.stream(event.content):
-                if isinstance(chunk, Usage):
-                    usage = asdict(chunk)
-                    continue
-                chunks.append(chunk)
+            if settings.rag_chat_enabled and owner_field == "user_id":
+                with session_factory() as db:
+                    conversation = db.get(Conversation, event.conversation_id)
+                    if conversation is None or conversation.user_id != owner_id:
+                        raise ScopeAccessError("Conversation not found")
+                    scope = RetrievalScope(owner_id, conversation.project_id, conversation.id)
+                embeddings = None
+                retrieval = getattr(websocket.app.state, "rag_retrieval", None)
+                if retrieval is None:
+                    embeddings = NvidiaEmbeddings(
+                        settings.rag_embedding_api_key or "",
+                        model=settings.rag_embedding_model,
+                        dimensions=settings.rag_embedding_dimensions,
+                    )
+                    retrieval = VectorRetrieval(session_factory, embeddings)
+                try:
+                    answer = await grounded_answer(scope, event.content, retrieval, provider)
+                except (EmbeddingError, ScopeAccessError) as exc:
+                    raise ProviderError("RETRIEVAL_UNAVAILABLE", True) from exc
+                finally:
+                    if embeddings is not None:
+                        await embeddings.close()
+                chunks = [answer.content]
+                usage = answer.usage
+                evidence = answer.evidence
+                cited_ordinals = answer.cited_ordinals
                 if connected:
                     try:
                         await send_event(
@@ -203,15 +232,42 @@ async def process_chat(
                             ServerEvent(
                                 type="message.delta",
                                 request_id=event.request_id,
-                                content=chunk,
+                                content=answer.content,
                             ),
                         )
                     except (WebSocketDisconnect, OSError, RuntimeError):
                         connected = False
+            else:
+                async for chunk in provider.stream(event.content):
+                    if isinstance(chunk, Usage):
+                        usage = asdict(chunk)
+                        continue
+                    chunks.append(chunk)
+                    if connected:
+                        try:
+                            await send_event(
+                                websocket,
+                                ServerEvent(
+                                    type="message.delta",
+                                    request_id=event.request_id,
+                                    content=chunk,
+                                ),
+                            )
+                        except (WebSocketDisconnect, OSError, RuntimeError):
+                            connected = False
         if not chunks:
             raise ProviderError("PROVIDER_EMPTY_RESPONSE", False)
         with session_factory() as db:
-            complete_chat(db, persisted_request_id, assistant_id, "".join(chunks), started, usage)
+            complete_chat(
+                db,
+                persisted_request_id,
+                assistant_id,
+                "".join(chunks),
+                started,
+                usage,
+                evidence=evidence,
+                cited_ordinals=cited_ordinals,
+            )
         if not connected:
             raise WebSocketDisconnect
         await send_event(

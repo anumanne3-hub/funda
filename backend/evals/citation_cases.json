@@ -1,0 +1,46 @@
+[
+  {
+    "name": "no indexed evidence",
+    "question": "When did the launch occur?",
+    "sources": [],
+    "model_answer": "The launch occurred on Tuesday [1].",
+    "expected": "insufficient"
+  },
+  {
+    "name": "one supported citation",
+    "question": "When did the launch occur?",
+    "sources": ["The launch occurred on Tuesday."],
+    "model_answer": "The launch occurred on Tuesday [1].",
+    "expected": "grounded",
+    "cited_ordinals": [1]
+  },
+  {
+    "name": "only the second source is cited",
+    "question": "When did the launch occur?",
+    "sources": ["The budget was approved.", "The launch occurred on Tuesday."],
+    "model_answer": "The launch occurred on Tuesday [2].",
+    "expected": "grounded",
+    "cited_ordinals": [2]
+  },
+  {
+    "name": "missing citation",
+    "question": "When did the launch occur?",
+    "sources": ["The launch occurred on Tuesday."],
+    "model_answer": "The launch occurred on Tuesday.",
+    "expected": "insufficient"
+  },
+  {
+    "name": "out of range citation",
+    "question": "When did the launch occur?",
+    "sources": ["The launch occurred on Tuesday."],
+    "model_answer": "The launch occurred on Tuesday [2].",
+    "expected": "insufficient"
+  },
+  {
+    "name": "mixed valid and invalid citations",
+    "question": "When did the launch occur?",
+    "sources": ["The launch occurred on Tuesday."],
+    "model_answer": "The launch occurred on Tuesday [1] [9].",
+    "expected": "insufficient"
+  }
+]

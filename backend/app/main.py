@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException
 from app.api.accounts import router as accounts_router
 from app.api.chat import router as chat_router
 from app.api.conversations import router as conversations_router
+from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.api.messages import router as messages_router
 from app.core.config import get_settings
@@ -41,6 +42,7 @@ app.include_router(health_router)
 app.include_router(chat_router, prefix=settings.api_prefix)
 app.include_router(conversations_router, prefix=settings.api_prefix)
 app.include_router(accounts_router, prefix=settings.api_prefix)
+app.include_router(documents_router, prefix=settings.api_prefix)
 app.include_router(messages_router, prefix=settings.api_prefix)
 
 
@@ -129,7 +131,7 @@ app.add_middleware(
     allow_origins=settings.frontend_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
-    allow_headers=["Content-Type", "Idempotency-Key", "X-Request-ID", "X-CSRF-Token"],
+    allow_headers=["Content-Type", "Idempotency-Key", "X-Filename", "X-Request-ID", "X-CSRF-Token"],
 )
 
 

@@ -35,6 +35,8 @@ import type {
 import { websocketUrl } from "./api/chatSocket";
 import type { ConnectionState, ServerEvent } from "./api/chatSocket";
 import { HelpPage } from "./HelpPage";
+import { MessageCitations } from "./MessageCitations";
+import { RagSources } from "./RagSources";
 
 type Pending = {
   type: "chat.send";
@@ -973,6 +975,13 @@ export function App() {
             </span>
           </div>
         </header>
+        {account && activeId && (
+          <RagSources
+            key={activeId}
+            projectId={active?.project_id ?? null}
+            conversationId={activeId}
+          />
+        )}
         <div className="messages" aria-live="polite">
           <div className="message-list">
             {notice && <p className="chat-notice">{notice}</p>}
@@ -1008,6 +1017,14 @@ export function App() {
                         ? "This request failed. You can send a new message."
                         : "Thinking…")}
                   </p>
+                  {account &&
+                    message.role === "assistant" &&
+                    message.status === "completed" && (
+                      <MessageCitations
+                        messageId={message.id}
+                        content={message.content}
+                      />
+                    )}
                   {message.status === "pending" && (
                     <span className="typing" aria-label="Streaming response" />
                   )}

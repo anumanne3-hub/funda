@@ -8,7 +8,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import ChatRequest, Conversation, Message, MessageVersion
+from app.models import ChatRequest, Conversation, Message, MessageCitation, MessageVersion
+from app.rag.contracts import RetrievedEvidence
 from app.services.limits import RequestRejected, consume
 
 
@@ -139,6 +140,8 @@ def complete_chat(
     content: str,
     started: float,
     usage: dict | None = None,
+    evidence: list[RetrievedEvidence] | None = None,
+    cited_ordinals: list[int] | None = None,
 ) -> None:
     request = db.get(ChatRequest, request_id)
     assistant = db.get(Message, assistant_id)
@@ -146,7 +149,34 @@ def complete_chat(
         raise RuntimeError("Persisted chat request disappeared")
     assistant.content = content
     assistant.status = "completed"
-    db.add(MessageVersion(message_id=assistant.id, version_number=1, content=content))
+    version = MessageVersion(message_id=assistant.id, version_number=1, content=content)
+    db.add(version)
+    db.flush()
+    if evidence:
+        if len(evidence) > 10:
+            raise ValueError("Too many citations")
+        ordinals = (
+            cited_ordinals if cited_ordinals is not None else list(range(1, len(evidence) + 1))
+        )
+        if any(index < 1 or index > len(evidence) for index in ordinals):
+            raise ValueError("Citation ordinal is out of range")
+        for index in sorted(set(ordinals)):
+            item = evidence[index - 1]
+            db.add(
+                MessageCitation(
+                    message_version_id=version.id,
+                    ordinal=index,
+                    document_id=item.document_id,
+                    document_version_id=item.document_version_id,
+                    chunk_id=item.chunk_id,
+                    title=item.title,
+                    source_url=item.source_url,
+                    page=item.location.page,
+                    section=item.location.section,
+                    start_ms=item.location.start_ms,
+                    end_ms=item.location.end_ms,
+                )
+            )
     request.status = "completed"
     request.duration_ms = int((time.perf_counter() - started) * 1000)
     if usage:

@@ -59,6 +59,105 @@ export type MessageVersion = {
   parent_version_id: string | null;
   content: string;
 };
+export type MessageCitation = {
+  ordinal: number;
+  document_id: string;
+  document_version_id: string;
+  chunk_id: string;
+  title: string;
+  source_url: string | null;
+  page: number | null;
+  section: string | null;
+  start_ms: number | null;
+  end_ms: number | null;
+};
+export type RagDocument = {
+  id: string;
+  project_id: string | null;
+  conversation_id: string | null;
+  source_kind: string;
+  source_key: string;
+  title: string;
+  created_at: string;
+};
+export type IngestionJob = {
+  id: string;
+  document_id: string;
+  status: string;
+  attempts: number;
+  error_code: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listProjectSources(
+  projectId: string,
+): Promise<RagDocument[]> {
+  return request(`/projects/${projectId}/sources`);
+}
+export async function listConversationUploads(
+  conversationId: string,
+): Promise<RagDocument[]> {
+  return request(`/conversations/${conversationId}/uploads`);
+}
+export async function listProjectIngestionJobs(
+  projectId: string,
+): Promise<IngestionJob[]> {
+  return request(`/projects/${projectId}/ingestion-jobs`);
+}
+export async function listConversationIngestionJobs(
+  conversationId: string,
+): Promise<IngestionJob[]> {
+  return request(`/conversations/${conversationId}/ingestion-jobs`);
+}
+export async function createProjectSource(
+  projectId: string,
+  url: string,
+  title: string,
+): Promise<RagDocument> {
+  return request(`/projects/${projectId}/sources`, {
+    method: "POST",
+    body: JSON.stringify({ url, title }),
+  });
+}
+export async function deleteRagDocument(id: string): Promise<void> {
+  await request<void>(`/documents/${id}`, { method: "DELETE" });
+}
+export async function syncRagDocument(
+  id: string,
+  key: string,
+): Promise<IngestionJob> {
+  return request(`/documents/${id}/sync`, {
+    method: "POST",
+    headers: { "Idempotency-Key": key },
+  });
+}
+export async function getIngestionJob(id: string): Promise<IngestionJob> {
+  return request(`/ingestion-jobs/${id}`);
+}
+export async function uploadConversationFile(
+  conversationId: string,
+  file: File,
+  key: string,
+): Promise<IngestionJob> {
+  return request(`/conversations/${conversationId}/uploads`, {
+    method: "POST",
+    headers: {
+      "Content-Type":
+        file.type ||
+        (file.name.endsWith(".md") ? "text/markdown" : "text/plain"),
+      "X-Filename": file.name,
+      "Idempotency-Key": key,
+    },
+    body: file,
+  });
+}
+
+export async function listMessageCitations(
+  id: string,
+): Promise<MessageCitation[]> {
+  return request(`/messages/${id}/citations`);
+}
 
 export async function currentAccount(): Promise<Account | null> {
   try {

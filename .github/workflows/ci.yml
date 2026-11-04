@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18-alpine
+        image: pgvector/pgvector:0.8.7-pg18
         env:
           POSTGRES_PASSWORD: test-only
           POSTGRES_DB: funda_test_ci

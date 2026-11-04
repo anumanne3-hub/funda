@@ -22,6 +22,7 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models import AccountSession, Conversation, Project, User
+from app.rag.deletion_queue import enqueue_document_storage
 
 router = APIRouter()
 hasher = PasswordHasher()
@@ -217,6 +218,7 @@ def delete_project(project_id: UUID, request: Request, db: Session = Depends(get
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    enqueue_document_storage(db, user_id=user.id, project_id=project_id)
     db.delete(project)
     db.commit()
 
@@ -253,6 +255,7 @@ def discard_anonymous(request: Request, response: Response, db: Session = Depend
 @router.delete("/auth/account", status_code=204)
 def delete_account(request: Request, response: Response, db: Session = Depends(get_db)) -> None:
     user = account_identity(request, db, csrf=True)
+    enqueue_document_storage(db, user_id=user.id)
     db.delete(user)
     db.commit()
     response.delete_cookie(ACCOUNT_COOKIE)

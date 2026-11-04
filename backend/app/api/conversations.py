@@ -14,6 +14,7 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models import AnonymousSession, Conversation, Project
+from app.rag.deletion_queue import enqueue_document_storage
 from app.schemas.conversation import (
     AnonymousSessionRead,
     ConversationCreate,
@@ -184,5 +185,7 @@ def delete_conversation(
     )
     if record is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
+    if record.user_id is not None:
+        enqueue_document_storage(db, user_id=record.user_id, conversation_id=conversation_id)
     db.delete(record)
     db.commit()
