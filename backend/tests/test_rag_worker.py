@@ -15,6 +15,7 @@ from app.rag.worker import ProcessingError, run_job
     [
         (ProcessingError("EXTRACT_FAILED"), "EXTRACT_FAILED", "failed"),
         (EmbeddingError("provider error"), "EMBEDDING_FAILED", "queued"),
+        (EmbeddingError("provider error", status_code=429), "EMBEDDING_HTTP_429", "queued"),
         (StorageError("storage error"), "STORAGE_FAILED", "queued"),
         (SQLAlchemyError("database error"), "DATABASE_FAILED", "queued"),
     ],

@@ -43,3 +43,15 @@ async def test_embedding_rejects_bad_response():
             await provider.embed_query("question")
         with pytest.raises(EmbeddingError):
             await provider.embed_query(" ")
+
+
+@pytest.mark.asyncio
+async def test_embedding_rejection_preserves_safe_http_status():
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda _: httpx.Response(429, text="private provider detail"))
+    ) as client:
+        provider = NvidiaEmbeddings("test-key", dimensions=2, client=client)
+        with pytest.raises(EmbeddingError) as error:
+            await provider.embed_query("question")
+    assert error.value.status_code == 429
+    assert "private provider detail" not in str(error.value)

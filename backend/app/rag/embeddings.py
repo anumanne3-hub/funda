@@ -11,7 +11,9 @@ MAX_BATCH = 16
 
 
 class EmbeddingError(Exception):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class NvidiaEmbeddings(EmbeddingProvider):
@@ -85,5 +87,11 @@ class NvidiaEmbeddings(EmbeddingProvider):
             if any(vector is None for vector in ordered):
                 raise ValueError("Missing embedding")
             return [vector for vector in ordered if vector is not None]
-        except (httpx.HTTPError, KeyError, TypeError, ValueError, IndexError) as exc:
-            raise EmbeddingError("Embedding provider failed") from exc
+        except httpx.HTTPStatusError as exc:
+            raise EmbeddingError(
+                "Embedding provider rejected request", status_code=exc.response.status_code
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise EmbeddingError("Embedding provider unavailable") from exc
+        except (KeyError, TypeError, ValueError, IndexError) as exc:
+            raise EmbeddingError("Embedding response invalid") from exc

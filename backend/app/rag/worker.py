@@ -49,8 +49,12 @@ async def run_job(
     except ProcessingError as exc:
         error_code = exc.code
         retryable = exc.retryable
-    except EmbeddingError:
-        error_code = "EMBEDDING_FAILED"
+    except EmbeddingError as exc:
+        error_code = (
+            f"EMBEDDING_HTTP_{exc.status_code}"
+            if exc.status_code is not None
+            else "EMBEDDING_FAILED"
+        )
         retryable = True
         logger.error("RAG embedding request failed", extra={"event": "rag.worker.embedding_failed"})
     except StorageError:
