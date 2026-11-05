@@ -11,7 +11,9 @@ BUCKET_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 
 
 class StorageError(Exception):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def object_key(user_id: UUID, document_id: UUID, version_id: UUID) -> str:
@@ -68,7 +70,8 @@ class PrivateStorage:
             )
             response.raise_for_status()
         except httpx.HTTPError as exc:
-            raise StorageError("Private object upload failed") from exc
+            status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+            raise StorageError("Private object upload failed", status_code=status) from exc
 
     def get(self, key: str) -> bytes:
         try:

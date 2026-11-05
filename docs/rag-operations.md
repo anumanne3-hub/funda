@@ -7,7 +7,8 @@ and cloud-folder ingestion are not yet available.
 
 ## Deploy in order
 
-1. Apply every `supabase/migrations/2026110400*.sql` migration. Confirm the `vector`
+1. Apply every RAG migration in `supabase/migrations/` dated 2026-11-04 or later,
+   including the project-source uniqueness update. Confirm the `vector`
    extension, the 2048-dimensional `document_chunks.embedding` column, and the
    `storage_deletions` table. Do not reset an existing database.
 2. Create a private Supabase Storage bucket matching `RAG_STORAGE_BUCKET` (default

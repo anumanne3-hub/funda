@@ -69,3 +69,13 @@ def test_missing_private_object_can_be_deleted_again():
             "https://example-project.supabase.co", "secret", "rag-private", client=client
         )
         storage.delete(object_key(uuid4(), uuid4(), uuid4()))
+
+
+def test_upload_error_retains_only_http_status():
+    with httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(403))) as client:
+        storage = PrivateStorage(
+            "https://example-project.supabase.co", "sb_secret_example", "rag-private", client=client
+        )
+        with pytest.raises(StorageError) as error:
+            storage.put(object_key(uuid4(), uuid4(), uuid4()), b"source", "text/plain")
+    assert error.value.status_code == 403

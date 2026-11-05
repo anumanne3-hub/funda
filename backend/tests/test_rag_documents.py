@@ -66,3 +66,37 @@ def test_source_and_job_are_owner_scoped(client, monkeypatch):
     client.post("/api/v1/auth/logout", headers=bob_headers).raise_for_status()
     alice_headers = _register(client, "alice-rag-new@example.com")
     assert client.get(f"/api/v1/ingestion-jobs/{job_id}").status_code == 404
+
+
+def test_same_website_can_be_added_to_another_project_or_after_deletion(client, monkeypatch):
+    url = "https://example.com/shared"
+    monkeypatch.setattr(get_settings(), "rag_allowed_source_urls", [url])
+    headers = _register(client, "source-scope@example.com")
+    first_project = client.post("/api/v1/projects", json={"name": "First"}, headers=headers).json()[
+        "id"
+    ]
+    second_project = client.post(
+        "/api/v1/projects", json={"name": "Second"}, headers=headers
+    ).json()["id"]
+    payload = {"url": url, "title": "Shared page"}
+    first = client.post(f"/api/v1/projects/{first_project}/sources", json=payload, headers=headers)
+    assert first.status_code == 201
+    assert (
+        client.post(
+            f"/api/v1/projects/{first_project}/sources", json=payload, headers=headers
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            f"/api/v1/projects/{second_project}/sources", json=payload, headers=headers
+        ).status_code
+        == 201
+    )
+    client.delete(f"/api/v1/documents/{first.json()['id']}", headers=headers).raise_for_status()
+    assert (
+        client.post(
+            f"/api/v1/projects/{first_project}/sources", json=payload, headers=headers
+        ).status_code
+        == 201
+    )

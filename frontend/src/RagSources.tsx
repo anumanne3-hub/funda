@@ -101,7 +101,7 @@ export function RagSources({
       setUrl("");
       setTitle("");
     } catch (failure) {
-      if (String(failure).includes("Source already exists")) {
+      if (String(failure).includes("Source already exists in this project")) {
         void listProjectSources(projectId)
           .then(setSources)
           .catch(() => undefined);
@@ -273,6 +273,9 @@ export function RagSources({
               </button>
             </form>
             <p>Only website URLs enabled for this app can be added.</p>
+            {sources.length === 0 && (
+              <p>No websites added to this project yet.</p>
+            )}
             <ul>
               {sources.map((source) => (
                 <li key={source.id}>

@@ -164,9 +164,12 @@ async def upload_to_conversation(
             db.rollback()
             await to_thread(storage.delete, path)
             raise
-    except StorageError:
+    except StorageError as exc:
         db.rollback()
-        raise HTTPException(status_code=503, detail="Private document storage failed") from None
+        detail = "Private document storage failed"
+        if exc.status_code is not None:
+            detail += f" (Storage HTTP {exc.status_code})"
+        raise HTTPException(status_code=503, detail=detail) from None
     finally:
         storage.close()
     db.refresh(job)
@@ -203,7 +206,9 @@ def create_source(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Source already exists") from None
+        raise HTTPException(
+            status_code=409, detail="Source already exists in this project"
+        ) from None
     db.refresh(document)
     return document
 

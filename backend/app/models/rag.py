@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -27,7 +28,16 @@ class Document(Base):
         CheckConstraint(
             "source_kind IN ('upload','website','cloud')", name="ck_document_source_kind"
         ),
-        UniqueConstraint("user_id", "source_kind", "source_key", name="uq_document_source"),
+        Index(
+            "uq_active_project_source",
+            "user_id",
+            "project_id",
+            "source_kind",
+            "source_key",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL AND project_id IS NOT NULL"),
+            sqlite_where=text("deleted_at IS NULL AND project_id IS NOT NULL"),
+        ),
         Index("ix_documents_project", "user_id", "project_id", "deleted_at"),
         Index("ix_documents_conversation", "user_id", "conversation_id", "deleted_at"),
     )
