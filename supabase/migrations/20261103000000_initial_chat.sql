@@ -1,5 +1,5 @@
 -- Initial chat schema. Apply only to an empty application schema.
-CREATE TABLE anonymous_sessions (
+CREATE TABLE anonymous_sessions ( 
     id UUID NOT NULL, 
     token_hash VARCHAR(64) NOT NULL, 
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL, 
