@@ -33,7 +33,10 @@ class PrivateStorage:
             raise ValueError("Storage service key is required")
         self.base_url = f"{project_url}/storage/v1/object"
         self.bucket = bucket
-        self.headers = {"Authorization": f"Bearer {service_key}", "apikey": service_key}
+        # Current Supabase secret keys are not JWTs and belong only in the apikey header.
+        self.headers = {"apikey": service_key}
+        if not service_key.startswith("sb_secret_"):
+            self.headers["Authorization"] = f"Bearer {service_key}"
         self.client = client or httpx.Client(timeout=15.0, follow_redirects=False, trust_env=False)
         self.owned_client = client is None
 

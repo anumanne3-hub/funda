@@ -15,6 +15,8 @@ and cloud-folder ingestion are not yet available.
 3. Set these Render backend variables privately: `RAG_STORAGE_URL`,
    `RAG_STORAGE_SERVICE_KEY`, `RAG_STORAGE_BUCKET`, `RAG_ALLOWED_SOURCE_URLS`,
    `RAG_DISPATCH_REPOSITORY`, `RAG_DISPATCH_REF`, and `RAG_DISPATCH_TOKEN`.
+   Use a Supabase secret API key (`sb_secret_...`) from Project Settings > API Keys
+   for `RAG_STORAGE_SERVICE_KEY`; never use a publishable key or expose it to the browser.
    `RAG_ALLOWED_SOURCE_URLS` is a comma-separated list of exact HTTPS page URLs.
 4. Set GitHub Actions secret values `RAG_DATABASE_URL`, `RAG_STORAGE_URL`,
    `RAG_STORAGE_SERVICE_KEY`, and `RAG_EMBEDDING_API_KEY`. Set Actions variables

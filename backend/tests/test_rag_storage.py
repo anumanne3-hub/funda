@@ -31,6 +31,23 @@ def test_private_storage_requests_are_bounded_and_authenticated():
     )
 
 
+def test_current_secret_key_uses_apikey_header_only():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        storage = PrivateStorage(
+            "https://example-project.supabase.co", "sb_secret_example", "rag-private", client=client
+        )
+        storage.delete(object_key(uuid4(), uuid4(), uuid4()))
+
+    assert requests[0].headers["apikey"] == "sb_secret_example"
+    assert "authorization" not in requests[0].headers
+
+
 def test_storage_rejects_invalid_config_paths_and_oversize():
     with pytest.raises(ValueError):
         PrivateStorage("http://localhost", "secret", "rag-private")
