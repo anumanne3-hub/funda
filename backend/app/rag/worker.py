@@ -6,10 +6,13 @@ from collections.abc import Callable
 from typing import Protocol
 from uuid import UUID
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models import IngestionJob
+from app.rag.embeddings import EmbeddingError
 from app.rag.jobs import LEASE_SECONDS, claim_job, finish_job
+from app.rag.storage import StorageError
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,18 @@ async def run_job(
     except ProcessingError as exc:
         error_code = exc.code
         retryable = exc.retryable
+    except EmbeddingError:
+        error_code = "EMBEDDING_FAILED"
+        retryable = True
+        logger.error("RAG embedding request failed", extra={"event": "rag.worker.embedding_failed"})
+    except StorageError:
+        error_code = "STORAGE_FAILED"
+        retryable = True
+        logger.error("RAG storage request failed", extra={"event": "rag.worker.storage_failed"})
+    except SQLAlchemyError:
+        error_code = "DATABASE_FAILED"
+        retryable = True
+        logger.error("RAG database operation failed", extra={"event": "rag.worker.database_failed"})
     except Exception:
         error_code = "PROCESSING_FAILED"
         retryable = True

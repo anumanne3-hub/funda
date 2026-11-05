@@ -7,7 +7,7 @@ on:
         required: true
         type: string
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 */5 * * *'
 permissions:
   contents: read
 concurrency:

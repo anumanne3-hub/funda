@@ -1,14 +1,28 @@
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import get_settings
 from app.main import app
+from app.rag.embeddings import EmbeddingError
+from app.rag.storage import StorageError
 from app.rag.worker import ProcessingError, run_job
 
 
+@pytest.mark.parametrize(
+    ("failure", "code", "status"),
+    [
+        (ProcessingError("EXTRACT_FAILED"), "EXTRACT_FAILED", "failed"),
+        (EmbeddingError("provider error"), "EMBEDDING_FAILED", "queued"),
+        (StorageError("storage error"), "STORAGE_FAILED", "queued"),
+        (SQLAlchemyError("database error"), "DATABASE_FAILED", "queued"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_worker_runs_requested_job_and_persists_failure(client, monkeypatch):
+async def test_worker_runs_requested_job_and_persists_failure(
+    client, monkeypatch, failure, code, status
+):
     url = "https://example.com/worker"
     monkeypatch.setattr(get_settings(), "rag_allowed_source_urls", [url])
     client.post(
@@ -32,12 +46,11 @@ async def test_worker_runs_requested_job_and_persists_failure(client, monkeypatc
 
     async def fail(job):
         seen.append(job.id)
-        raise ProcessingError("EXTRACT_FAILED", retryable=False)
+        raise failure
 
     assert not await run_job(uuid4(), app.state.session_factory, fail)
     assert await run_job(job_id, app.state.session_factory, fail)
     assert seen == [job_id]
-    assert not await run_job(job_id, app.state.session_factory, fail)
     result = client.get(f"/api/v1/ingestion-jobs/{job_id}").json()
-    assert result["status"] == "failed"
-    assert result["error_code"] == "EXTRACT_FAILED"
+    assert result["status"] == status
+    assert result["error_code"] == code

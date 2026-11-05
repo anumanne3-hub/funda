@@ -14,7 +14,7 @@ checks passed. All Milestone 3 changes are still uncommitted in this working tre
 
 - The agreed worker runs as a GitHub Actions workflow, triggered by the backend for
   manual syncs and chat uploads. A scheduled reconciliation run now scans up to 20 queued
-  or lease-expired jobs every 30 minutes. Supabase stores
+  or lease-expired jobs at 00:00, 05:00, 10:00, 15:00 and 20:00 UTC. Supabase stores
   durable jobs, private files, chunks and vectors. NVIDIA trial endpoints are for
   development/evaluation; production model access requires appropriate terms.
 - Existing code: `backend/app/rag/contracts.py` defines scope, source locations,

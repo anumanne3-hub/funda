@@ -28,8 +28,8 @@ and cloud-folder ingestion are not yet available.
    The embedding model and dimensions must match between Render and Actions.
 
 The `rag-ingest.yml` workflow handles individual dispatches and reconciles up to 20 queued
-or expired jobs every 30 minutes. Its scheduled cleanup handles at most 20 soft-deleted
-documents and 100 queued object deletions per run. GitHub schedules are not a latency
+or expired jobs at 00:00, 05:00, 10:00, 15:00 and 20:00 UTC. Its scheduled cleanup handles
+at most 20 soft-deleted documents and 100 queued object deletions per run. GitHub schedules are not a latency
 guarantee. An object deletion failure leaves its key in `storage_deletions` for retry.
 
 ## Local and CI verification
