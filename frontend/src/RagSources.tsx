@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import {
   createProjectSource,
@@ -27,6 +27,7 @@ export function RagSources({
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -83,19 +84,31 @@ export function RagSources({
   async function addSource(event: FormEvent) {
     event.preventDefault();
     if (!projectId) return;
+    const sourceUrl = url.trim();
+    if (sources.some((source) => source.source_key === sourceUrl)) {
+      setError("This website is already listed below. Use its Sync button.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const source = await createProjectSource(
         projectId,
-        url.trim(),
+        sourceUrl,
         title.trim(),
       );
       setSources((current) => [source, ...current]);
       setUrl("");
       setTitle("");
     } catch (failure) {
-      setError(String(failure));
+      if (String(failure).includes("Source already exists")) {
+        void listProjectSources(projectId)
+          .then(setSources)
+          .catch(() => undefined);
+        setError("This website is already listed below. Use its Sync button.");
+      } else {
+        setError(String(failure));
+      }
     } finally {
       setBusy(false);
     }
@@ -165,10 +178,43 @@ export function RagSources({
     }
   }
 
+  const visibleIds = new Set(
+    [...sources, ...uploads].map((source) => source.id),
+  );
+  const counts = { queued: 0, running: 0, failed: 0, completed: 0 };
+  for (const job of Object.values(jobs)) {
+    if (visibleIds.has(job.document_id) && job.status in counts) {
+      counts[job.status as keyof typeof counts] += 1;
+    }
+  }
+  const statusSummary = (["running", "queued", "failed", "completed"] as const)
+    .filter((status) => counts[status] > 0)
+    .map((status) => `${counts[status]} ${status}`)
+    .join(" · ");
+
   return (
     <section className="rag-sources" aria-label="Documents and sources">
-      <details>
-        <summary>Documents and sources</summary>
+      <button
+        type="button"
+        className="rag-sources-open"
+        onClick={() => dialogRef.current?.showModal()}
+      >
+        Documents and sources
+        <span className="rag-sources-status" role="status">
+          {statusSummary || "No syncs yet"}
+        </span>
+      </button>
+      <dialog
+        ref={dialogRef}
+        className="rag-sources-dialog"
+        aria-labelledby="rag-sources-title"
+      >
+        <div className="rag-sources-dialog-header">
+          <h2 id="rag-sources-title">Documents and sources</h2>
+          <button type="button" onClick={() => dialogRef.current?.close()}>
+            Close
+          </button>
+        </div>
         {error && <p role="alert">{error}</p>}
         <label className="rag-upload">
           Upload to this chat (.txt, .md, .html)
@@ -226,7 +272,7 @@ export function RagSources({
                 Add source
               </button>
             </form>
-            <p>Website URLs must be configured by the server owner.</p>
+            <p>Only website URLs enabled for this app can be added.</p>
             <ul>
               {sources.map((source) => (
                 <li key={source.id}>
@@ -255,7 +301,7 @@ export function RagSources({
             </ul>
           </>
         )}
-      </details>
+      </dialog>
     </section>
   );
 }
