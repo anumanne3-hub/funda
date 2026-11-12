@@ -61,8 +61,9 @@ async def run_job(
         error_code = "STORAGE_FAILED"
         retryable = True
         logger.error(
-            "RAG storage request failed (HTTP %s)",
+            "RAG storage request failed (HTTP %s; cause %s)",
             exc.status_code if exc.status_code is not None else "unavailable",
+            type(exc.__cause__).__name__ if exc.__cause__ is not None else "unknown",
             extra={"event": "rag.worker.storage_failed", "status_code": exc.status_code},
         )
     except SQLAlchemyError:
