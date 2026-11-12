@@ -11,6 +11,22 @@ def _register(client, email):
     return {"X-CSRF-Token": client.get("/api/v1/auth/csrf").json()["csrf_token"]}
 
 
+def test_allowed_source_urls_show_the_configured_https_pages_to_accounts(client, monkeypatch):
+    path = "/api/v1/rag/allowed-source-urls"
+    assert client.get(path).status_code == 401
+    _register(client, "allowed-list@example.com")
+    monkeypatch.setattr(
+        get_settings(),
+        "rag_allowed_source_urls",
+        [
+            "https://science.nasa.gov/earth/facts/",
+            "http://example.com",
+            "https://example.com/#part",
+        ],
+    )
+    assert client.get(path).json() == ["https://science.nasa.gov/earth/facts/"]
+
+
 def test_source_and_job_are_owner_scoped(client, monkeypatch):
     url = "https://example.com/allowed"
     monkeypatch.setattr(get_settings(), "rag_allowed_source_urls", [url])

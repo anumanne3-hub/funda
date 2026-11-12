@@ -4,6 +4,7 @@ import {
   createProjectSource,
   deleteRagDocument,
   getIngestionJob,
+  listAllowedSourceUrls,
   listConversationIngestionJobs,
   listConversationUploads,
   listProjectIngestionJobs,
@@ -36,6 +37,9 @@ export function RagSources({
     message: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showAllowedUrls, setShowAllowedUrls] = useState(false);
+  const [allowedUrls, setAllowedUrls] = useState<string[] | null>(null);
+  const [allowedUrlsError, setAllowedUrlsError] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const trackedUploads = useRef(new Map<string, string>());
 
@@ -83,6 +87,22 @@ export function RagSources({
       active = false;
     };
   }, [projectId, conversationId]);
+
+  async function toggleAllowedUrls() {
+    if (showAllowedUrls) {
+      setShowAllowedUrls(false);
+      return;
+    }
+    setShowAllowedUrls(true);
+    if (allowedUrls !== null) return;
+    setAllowedUrlsError(false);
+    try {
+      setAllowedUrls(await listAllowedSourceUrls());
+      setAllowedUrlsError(false);
+    } catch {
+      setAllowedUrlsError(true);
+    }
+  }
 
   useEffect(() => {
     const pending = Object.values(jobs).filter(
@@ -353,7 +373,53 @@ export function RagSources({
                 Add source
               </button>
             </form>
-            <p>Only website URLs enabled for this app can be added.</p>
+            <div className="rag-allowed-urls-note">
+              <span>Only website URLs enabled for this app can be added.</span>
+              <button
+                type="button"
+                className="rag-info-button"
+                aria-label="Show valid website URLs"
+                aria-expanded={showAllowedUrls}
+                aria-controls="rag-allowed-urls-popup"
+                onClick={() => void toggleAllowedUrls()}
+              >
+                i
+              </button>
+              {showAllowedUrls && (
+                <div
+                  id="rag-allowed-urls-popup"
+                  className="rag-allowed-urls-popup"
+                  role="dialog"
+                  aria-label="Valid website URLs"
+                >
+                  <div className="rag-allowed-urls-popup-header">
+                    <strong>Valid website URLs</strong>
+                    <button
+                      type="button"
+                      aria-label="Close valid website URLs"
+                      onClick={() => setShowAllowedUrls(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {allowedUrlsError ? (
+                    <p>Could not load the allowed URLs. Close and try again.</p>
+                  ) : allowedUrls === null ? (
+                    <p>Loading URLs…</p>
+                  ) : allowedUrls.length === 0 ? (
+                    <p>No website URLs are enabled for this app.</p>
+                  ) : (
+                    <ul>
+                      {allowedUrls.map((allowedUrl) => (
+                        <li key={allowedUrl}>
+                          <code>{allowedUrl}</code>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
             {sources.length === 0 && (
               <p>No websites added to this project yet.</p>
             )}

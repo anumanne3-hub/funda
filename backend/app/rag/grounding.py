@@ -8,6 +8,10 @@ from app.providers.llm import LLMProvider, Usage
 from app.rag.contracts import RetrievalScope, RetrievalService, RetrievedEvidence
 
 INSUFFICIENT_EVIDENCE = "I couldn't find enough indexed evidence to answer that question."
+UNCITED_EVIDENCE = (
+    "I found indexed passages, but couldn't verify an answer with citations. "
+    "Try asking a more specific question about the source."
+)
 CITATION_PATTERN = re.compile(r"\[(\d{1,2})\]")
 
 
@@ -55,5 +59,5 @@ async def grounded_answer(
     answer = "".join(parts).strip()
     used = {int(match) for match in CITATION_PATTERN.findall(answer)}
     if not used or any(index < 1 or index > len(evidence) for index in used):
-        return GroundedAnswer(INSUFFICIENT_EVIDENCE, [], [], usage)
+        return GroundedAnswer(UNCITED_EVIDENCE, [], [], usage)
     return GroundedAnswer(answer, evidence, sorted(used), usage)

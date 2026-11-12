@@ -79,6 +79,20 @@ def upload_storage() -> PrivateStorage:
     )
 
 
+@router.get("/rag/allowed-source-urls", response_model=list[str])
+def allowed_source_urls(request: Request, db: Session = Depends(get_db)) -> list[str]:
+    account_identity(request, db)
+    return [
+        url
+        for url in get_settings().rag_allowed_source_urls
+        if (parsed := urlsplit(url)).scheme == "https"
+        and parsed.hostname
+        and not parsed.username
+        and not parsed.password
+        and not parsed.fragment
+    ]
+
+
 @router.post("/conversations/{conversation_id}/uploads", response_model=JobRead, status_code=202)
 async def upload_to_conversation(
     conversation_id: UUID, request: Request, db: Session = Depends(get_db)

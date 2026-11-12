@@ -100,6 +100,9 @@ export async function listProjectSources(
 ): Promise<RagDocument[]> {
   return request(`/projects/${projectId}/sources`);
 }
+export async function listAllowedSourceUrls(): Promise<string[]> {
+  return request("/rag/allowed-source-urls");
+}
 export async function listConversationUploads(
   conversationId: string,
 ): Promise<RagDocument[]> {

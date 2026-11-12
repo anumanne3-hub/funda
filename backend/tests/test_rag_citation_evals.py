@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.rag.contracts import RetrievalScope, RetrievedEvidence, SourceLocation
-from app.rag.grounding import INSUFFICIENT_EVIDENCE, grounded_answer
+from app.rag.grounding import INSUFFICIENT_EVIDENCE, UNCITED_EVIDENCE, grounded_answer
 
 CASES = json.loads((Path(__file__).resolve().parents[1] / "evals/citation_cases.json").read_text())
 
@@ -54,7 +54,7 @@ async def test_fixed_citation_cases(case):
         assert result.evidence == retrieval.evidence
         assert result.cited_ordinals == case["cited_ordinals"]
     else:
-        assert result.content == INSUFFICIENT_EVIDENCE
+        assert result.content == (UNCITED_EVIDENCE if case["sources"] else INSUFFICIENT_EVIDENCE)
         assert result.evidence == []
         assert result.cited_ordinals == []
     assert provider.calls == (1 if case["sources"] else 0)

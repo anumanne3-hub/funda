@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 
 from app.rag.contracts import RetrievalScope, RetrievedEvidence, SourceLocation
-from app.rag.grounding import INSUFFICIENT_EVIDENCE, grounded_answer
+from app.rag.grounding import INSUFFICIENT_EVIDENCE, UNCITED_EVIDENCE, grounded_answer
 
 
 class FakeRetrieval:
@@ -45,7 +45,7 @@ async def test_grounded_answer_requires_evidence_and_citation():
     unsupported = await grounded_answer(
         scope, "What happened?", FakeRetrieval([evidence]), provider
     )
-    assert unsupported.content == INSUFFICIENT_EVIDENCE
+    assert unsupported.content == UNCITED_EVIDENCE
     assert "untrusted data" in provider.prompts[-1]
     assert "The mission launched." in provider.prompts[-1]
 
