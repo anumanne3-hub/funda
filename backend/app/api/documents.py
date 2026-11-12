@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from asyncio import to_thread
 from datetime import UTC, datetime
 from urllib.parse import urlsplit
@@ -19,6 +20,7 @@ from app.rag.extract_text import ExtractionError, extract_text
 from app.rag.storage import MAX_OBJECT_BYTES, PrivateStorage, StorageError, object_key
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class SourceInput(BaseModel):
@@ -166,6 +168,10 @@ async def upload_to_conversation(
             raise
     except StorageError as exc:
         db.rollback()
+        logger.warning(
+            "Private storage upload failed",
+            extra={"event": "rag.storage.upload_failed", "status_code": exc.status_code},
+        )
         detail = "Private document storage failed"
         if exc.status_code is not None:
             detail += f" (Storage HTTP {exc.status_code})"

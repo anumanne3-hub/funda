@@ -57,10 +57,13 @@ async def run_job(
         )
         retryable = True
         logger.error("RAG embedding request failed", extra={"event": "rag.worker.embedding_failed"})
-    except StorageError:
+    except StorageError as exc:
         error_code = "STORAGE_FAILED"
         retryable = True
-        logger.error("RAG storage request failed", extra={"event": "rag.worker.storage_failed"})
+        logger.error(
+            "RAG storage request failed",
+            extra={"event": "rag.worker.storage_failed", "status_code": exc.status_code},
+        )
     except SQLAlchemyError:
         error_code = "DATABASE_FAILED"
         retryable = True
