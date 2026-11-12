@@ -147,7 +147,9 @@ export async function uploadConversationFile(
 ): Promise<IngestionJob> {
   const extension = file.name.toLowerCase().split(".").pop();
   const mediaType =
-    extension === "html"
+    extension === "pdf"
+      ? "application/pdf"
+      : extension === "html"
       ? "text/html"
       : extension === "md" || extension === "markdown"
         ? "text/markdown"

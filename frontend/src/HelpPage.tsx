@@ -338,18 +338,26 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
             <>
               <h1>RAG</h1>
               <p>
-                Planned Milestone 3 architecture. Retrieval augmented generation
-                (RAG) finds relevant source material and uses it to answer a
-                question with citations. These capabilities are not yet
-                implemented.
+                Retrieval augmented generation (RAG) finds relevant source
+                material and uses it to answer with citations. Signed-in users
+                can sync allowlisted website pages for a project and upload
+                text, Markdown, HTML, or PDF files to one chat. A completed job
+                makes its source available for grounded answers.
+              </p>
+              <p>
+                Project websites are available in every conversation assigned
+                to that project. A document uploaded with the paperclip is
+                available only in that conversation. New chats inherit the
+                current chat&apos;s project unless a project filter is selected.
+                Existing chats must be assigned to the project to use its sources.
               </p>
               <section className="help-card">
                 <h2>Ingestion: prepare source material</h2>
-                <div className="rag-flow" aria-label="Planned ingestion flow">
+                <div className="rag-flow" aria-label="Ingestion flow">
                   <div>
                     <strong>Sources</strong>
                     <span>
-                      Project websites and files, or an upload in chat
+                      Allowlisted website pages or a supported chat file
                     </span>
                   </div>
                   <span className="rag-arrow" aria-hidden="true">
@@ -358,7 +366,7 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                   <div>
                     <strong>Trigger</strong>
                     <span>
-                      Sync button or chat upload; scheduled sync later
+                      Sync button or chat upload
                     </span>
                   </div>
                   <span className="rag-arrow" aria-hidden="true">
@@ -394,16 +402,17 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
                 <p>
-                  Images may need OCR or a vision model; audio needs
-                  transcription. Source locations and timestamps support
-                  citations.
+                  Jobs can be queued, running, completed, or failed. The
+                  paperclip shows activity and upload toasts report progress.
+                  Image, audio, and cloud folder ingestion are not yet available.
+                  PDF uploads preserve page numbers for citations.
                 </p>
               </section>
               <section className="help-card rag-section">
                 <h2>Retrieval: answer a question</h2>
                 <div
                   className="rag-flow"
-                  aria-label="Planned question answering flow"
+                  aria-label="Question answering flow"
                 >
                   <div>
                     <strong>Chat question</strong>
@@ -428,24 +437,24 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                   </span>
                   <div>
                     <strong>Answer and citations</strong>
-                    <span>Show the source, page or audio timestamp</span>
+                    <span>Show the source and supporting passage</span>
                   </div>
                 </div>
                 <p>
                   Project sources are scoped to their project; chat uploads are
                   scoped to their conversation. If evidence is insufficient, the
-                  answer should say so.
+                  answer says so. Citations are saved with the answer and
+                  remain visible after reload.
                 </p>
               </section>
               <section className="help-card rag-section">
                 <h2>Reliability and model access</h2>
                 <p>
-                  Jobs are designed for safe retries, recovery and
-                  deduplication. GitHub Actions may queue or delay a run, so the
-                  UI will show its status. The backend holds workflow
-                  credentials. NVIDIA trial models are planned for development
-                  and evaluation; production model access must use appropriate
-                  terms.
+                  Jobs use durable attempts and leases for retries and recovery.
+                  GitHub Actions may delay a run, so the UI shows its status.
+                  The backend holds workflow and private storage credentials.
+                  Full hosted acceptance, including PDF uploads, is still
+                  pending.
                 </p>
               </section>
             </>

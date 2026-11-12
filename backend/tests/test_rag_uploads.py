@@ -1,6 +1,9 @@
+from io import BytesIO
 from uuid import UUID, uuid4
 
 import pytest
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.api import documents
 from app.main import app
@@ -26,6 +29,27 @@ class FakeStorage:
         pass
 
 
+def pdf_upload() -> bytes:
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=300)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
+    )
+    stream = DecodedStreamObject()
+    stream.set_data(b"BT /F1 12 Tf 20 250 Td (Earth has one moon.) Tj ET")
+    page[NameObject("/Contents")] = writer._add_object(stream)
+    output = BytesIO()
+    writer.write(output)
+    return output.getvalue()
+
+
 def test_text_upload_is_private_idempotent_and_queued(client, monkeypatch):
     storage = FakeStorage()
     monkeypatch.setattr(documents, "upload_storage", lambda: storage)
@@ -48,7 +72,19 @@ def test_text_upload_is_private_idempotent_and_queued(client, monkeypatch):
         client.post(
             path, content=b"%PDF", headers={**upload_headers, "Content-Type": "application/pdf"}
         ).status_code
-        == 415
+        == 422
+    )
+    blank = PdfWriter()
+    blank.add_blank_page(width=300, height=300)
+    blank_output = BytesIO()
+    blank.write(blank_output)
+    assert (
+        client.post(
+            path,
+            content=blank_output.getvalue(),
+            headers={**upload_headers, "Content-Type": "application/pdf"},
+        ).status_code
+        == 422
     )
     assert client.post(path, content=b"\xff", headers=upload_headers).status_code == 422
     assert client.post(path, content=b"", headers=upload_headers).status_code == 422
@@ -109,6 +145,7 @@ def test_text_upload_is_private_idempotent_and_queued(client, monkeypatch):
             b"<h1>Earth</h1><p>Earth has one moon.</p><script>ignore me</script>",
             "Earth has one moon.",
         ),
+        ("notes.pdf", "application/pdf", pdf_upload(), "Earth has one moon."),
     ],
 )
 @pytest.mark.asyncio
@@ -162,3 +199,5 @@ async def test_uploaded_file_is_indexed_and_visible_after_worker(
         chunks = db.query(DocumentChunk).all()
         assert chunks and expected_text in " ".join(chunk.content for chunk in chunks)
         assert "ignore me" not in " ".join(chunk.content for chunk in chunks)
+        if media_type == "application/pdf":
+            assert all(chunk.page == 1 for chunk in chunks)

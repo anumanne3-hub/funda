@@ -1,9 +1,11 @@
 # Milestone 3 RAG deployment and acceptance
 
-RAG chat is gated by `RAG_CHAT_ENABLED=false`. Keep it disabled until the checks below pass
-on a disposable hosted project and again on the intended deployment. Text, Markdown, HTML,
-and allowlisted single-page websites are the implemented source types. PDF, image, audio,
-and cloud-folder ingestion are not yet available.
+The Render blueprint currently sets `RAG_CHAT_ENABLED=true`. Text, Markdown, HTML,
+PDF uploads, and allowlisted single-page websites are implemented; image, audio,
+and cloud-folder ingestion are not yet available. A NASA Earth website sync and cited
+answer have worked on the hosted app, but the full acceptance checklist below
+has not been recorded. An earlier conversation upload returned HTTP 503 and
+still requires a successful hosted retest. Treat this as an open release gate.
 
 ## Deploy in order
 
@@ -24,9 +26,9 @@ and cloud-folder ingestion are not yet available.
    `RAG_STORAGE_BUCKET` and `RAG_ALLOWED_SOURCE_URLS`. The database URL must use
    the hosted PostgreSQL database with the access needed for worker writes. Grant the
    dispatch token access only to the intended repository workflow.
-5. Keep `RAG_CHAT_ENABLED=false` while running ingestion and retrieval acceptance.
-   Set `RAG_EMBEDDING_API_KEY` on Render only when ready to test chat retrieval.
-   The embedding model and dimensions must match between Render and Actions.
+5. Confirm `RAG_EMBEDDING_API_KEY` is configured on Render before chat retrieval
+   acceptance. The embedding model and dimensions must match between Render and
+   Actions. If hosted RAG fails, set `RAG_CHAT_ENABLED=false` and redeploy.
 
 The `rag-ingest.yml` workflow handles individual dispatches and reconciles up to 20 queued
 or expired jobs at 00:00, 05:00, 10:00, 15:00 and 20:00 UTC. Its scheduled cleanup handles
@@ -49,9 +51,13 @@ Use two new test accounts and a project owned by the first account.
 1. Register one URL from `RAG_ALLOWED_SOURCE_URLS` and one URL outside it. Confirm the
    first registers and the second is rejected. Sync the allowed source; watch the job
    move from queued through running to completed. Reload and confirm its status remains.
-2. Upload a small UTF-8 `.txt`, `.md`, and `.html` file into a conversation. Confirm each
+2. Upload a small UTF-8 `.txt`, `.md`, `.html`, and a text PDF into a conversation. Confirm each
    has a completed job and appears after reload. Reject an unsupported file and an
-   oversized file without creating a document or job.
+   oversized file without creating a document or job. Reject an encrypted PDF;
+   confirm the text PDF cites the right page.
+   Create a second conversation in the same project: it should show the synced
+   project website but not the first chat's uploaded file. Confirm a new chat
+   created from a project chat inherits that project.
 3. With RAG chat enabled on a test deployment, ask a question answered by a known source.
    Confirm the answer cites `[1]` or another shown source number, the Sources panel
    points to the correct document/version/location, and citations remain after reload.
@@ -73,9 +79,9 @@ each check. Do not record source contents or credentials in logs or issue commen
 
 ## Release decision and rollback
 
-Enable `RAG_CHAT_ENABLED=true` only after hosted acceptance, provider access and quotas,
-and the outstanding Milestone 2 release gates are verified. If ingestion or retrieval
-fails after enablement, set `RAG_CHAT_ENABLED=false` and redeploy the API. This disables
+Before declaring the enabled RAG path released, complete hosted acceptance, provider
+access and quota checks, and outstanding Milestone 2 release gates. If ingestion or retrieval
+fails, set `RAG_CHAT_ENABLED=false` and redeploy the API. This disables
 grounded chat without deleting indexed data or queued cleanup work. Investigate failed
 jobs by their sanitized `error_code`; retry only through a new sync request or the
 scheduled recovery flow. Do not manually mark a failed version ready.

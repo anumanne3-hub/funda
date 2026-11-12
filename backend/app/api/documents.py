@@ -98,7 +98,7 @@ async def upload_to_conversation(
     if not title or len(title) > 500 or any(c in title for c in "/\\\r\n\x00"):
         raise HTTPException(status_code=422, detail="A valid X-Filename is required")
     media_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
-    if media_type not in {"text/plain", "text/markdown", "text/html"}:
+    if media_type not in {"text/plain", "text/markdown", "text/html", "application/pdf"}:
         raise HTTPException(status_code=415, detail="Unsupported upload type")
     body = bytearray()
     async for chunk in request.stream():
@@ -108,7 +108,9 @@ async def upload_to_conversation(
     if not body:
         raise HTTPException(status_code=422, detail="Upload is empty")
     try:
-        extract_text(bytes(body), media_type)
+        segments = extract_text(bytes(body), media_type)
+        if not any(segment.text.strip() for segment in segments):
+            raise ExtractionError("Source has no extractable text")
     except ExtractionError:
         raise HTTPException(status_code=422, detail="Upload could not be extracted") from None
     content_hash = hashlib.sha256(body).hexdigest()

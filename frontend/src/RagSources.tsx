@@ -266,7 +266,7 @@ export function RagSources({
       <input
         ref={uploadInputRef}
         type="file"
-        accept=".txt,.md,.markdown,.html,text/plain,text/markdown,text/html"
+        accept=".txt,.md,.markdown,.html,.pdf,text/plain,text/markdown,text/html,application/pdf"
         aria-label="Choose a file to upload to this chat"
         hidden
         disabled={busy}

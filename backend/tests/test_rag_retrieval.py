@@ -68,7 +68,10 @@ async def test_postgres_retrieval_filters_owner_scope_and_readiness():
                     conversation = Conversation(
                         user_id=owner.id, project_id=project.id, title="Chat"
                     )
-                    db.add(conversation)
+                    second_conversation = Conversation(
+                        user_id=owner.id, project_id=project.id, title="Second chat"
+                    )
+                    db.add_all([conversation, second_conversation])
                     db.flush()
                     rows = [
                         Document(
@@ -140,10 +143,11 @@ async def test_postgres_retrieval_filters_owner_scope_and_readiness():
                         )
                         write_pgvector(db, chunk.id, vector)
                     db.commit()
-                    owner_id, project_id, conversation_id, other_id = (
+                    owner_id, project_id, conversation_id, second_id, other_id = (
                         owner.id,
                         project.id,
                         conversation.id,
+                        second_conversation.id,
                         other.id,
                     )
                 retrieval = VectorRetrieval(factory, FakeEmbeddings())
@@ -152,6 +156,10 @@ async def test_postgres_retrieval_filters_owner_scope_and_readiness():
                 )
                 assert [item.title for item in both] == ["Own", "Upload"]
                 assert all(item.location.section == "Evidence" for item in both)
+                second_chat = await retrieval.search(
+                    RetrievalScope(owner_id, project_id, second_id), "query", limit=5
+                )
+                assert [item.title for item in second_chat] == ["Own"]
                 project_only = await retrieval.search(
                     RetrievalScope(owner_id, project_id, None), "query", limit=5
                 )

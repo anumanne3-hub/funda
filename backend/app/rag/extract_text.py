@@ -1,11 +1,15 @@
-"""Bounded extraction for UTF-8 text, Markdown, and HTML sources."""
+"""Bounded extraction for UTF-8 text, Markdown, HTML, and PDF sources."""
 
 from html.parser import HTMLParser
+from io import BytesIO
+
+from pypdf import PdfReader
 
 from app.rag.contracts import ExtractedText, SourceLocation
 
 MAX_INPUT_BYTES = 2 * 1024 * 1024
 MAX_TEXT_CHARS = 500_000
+MAX_PDF_PAGES = 50
 SKIP_TAGS = {"script", "style", "noscript", "template", "svg"}
 BLOCK_TAGS = {"p", "div", "li", "br", "tr", "article", "section", "blockquote"}
 HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
@@ -72,6 +76,30 @@ class _VisibleHTML(HTMLParser):
 def extract_text(content: bytes, media_type: str) -> list[ExtractedText]:
     if len(content) > MAX_INPUT_BYTES:
         raise ExtractionError("Source exceeds byte limit")
+    if media_type == "application/pdf":
+        if not content.startswith(b"%PDF-"):
+            raise ExtractionError("Source is not a PDF")
+        try:
+            reader = PdfReader(BytesIO(content), strict=True)
+            if reader.is_encrypted:
+                raise ExtractionError("Encrypted PDFs are unsupported")
+            page_count = len(reader.pages)
+            if not 1 <= page_count <= MAX_PDF_PAGES:
+                raise ExtractionError("PDF page count exceeds limit")
+            sections: list[ExtractedText] = []
+            total_chars = 0
+            for page_number, page in enumerate(reader.pages, start=1):
+                text = page.extract_text() or ""
+                total_chars += len(text)
+                if total_chars > MAX_TEXT_CHARS:
+                    raise ExtractionError("Extracted text exceeds limit")
+                if text.strip():
+                    sections.append(ExtractedText(text, SourceLocation(page=page_number)))
+            return sections
+        except ExtractionError:
+            raise
+        except Exception as exc:
+            raise ExtractionError("PDF could not be extracted") from exc
     if media_type not in {"text/plain", "text/markdown", "text/html"}:
         raise ExtractionError("Unsupported media type")
     try:

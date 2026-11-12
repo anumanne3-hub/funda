@@ -1,7 +1,50 @@
+from io import BytesIO
+
 import pytest
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.rag.chunking import chunk_text
-from app.rag.extract_text import MAX_TEXT_CHARS, ExtractionError, extract_text
+from app.rag.extract_text import MAX_PDF_PAGES, MAX_TEXT_CHARS, ExtractionError, extract_text
+
+
+def sample_pdf(*, pages: int = 2, encrypted: bool = False) -> bytes:
+    writer = PdfWriter()
+    for index in range(pages):
+        page = writer.add_blank_page(width=300, height=300)
+        font = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }
+        )
+        font_ref = writer._add_object(font)
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_ref})}
+        )
+        stream = DecodedStreamObject()
+        stream.set_data(f"BT /F1 12 Tf 20 250 Td (Page {index + 1}) Tj ET".encode())
+        page[NameObject("/Contents")] = writer._add_object(stream)
+    if encrypted:
+        writer.encrypt("secret")
+    output = BytesIO()
+    writer.write(output)
+    return output.getvalue()
+
+
+def test_pdf_extraction_preserves_pages_and_rejects_invalid_files():
+    sections = extract_text(sample_pdf(), "application/pdf")
+    assert [(item.text.strip(), item.location.page) for item in sections] == [
+        ("Page 1", 1),
+        ("Page 2", 2),
+    ]
+    with pytest.raises(ExtractionError):
+        extract_text(b"%PDF-not a real file", "application/pdf")
+    with pytest.raises(ExtractionError):
+        extract_text(sample_pdf(encrypted=True), "application/pdf")
+    with pytest.raises(ExtractionError):
+        extract_text(sample_pdf(pages=MAX_PDF_PAGES + 1), "application/pdf")
 
 
 def test_html_extraction_preserves_sections_and_excludes_hidden_content():
