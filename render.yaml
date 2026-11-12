@@ -37,3 +37,5 @@ services:
         value: '100'
       - key: LLM_DAILY_BUDGET_USD
         value: '1'
+      - key: RAG_CHAT_ENABLED
+        value: 'true'
