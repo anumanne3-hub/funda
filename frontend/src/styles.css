@@ -693,6 +693,28 @@ button:disabled {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(215, 255, 0, 0.18);
 }
+.composer-upload {
+  display: grid;
+  flex: 0 0 38px;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.composer-upload:hover,
+.composer-upload:focus-visible {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.composer-upload svg {
+  width: 22px;
+  height: 22px;
+}
 textarea {
   flex: 1;
   min-height: 28px;
@@ -748,6 +770,25 @@ textarea::placeholder {
   gap: 8px;
   cursor: pointer;
   font-weight: 600;
+}
+.rag-sources-titles {
+  display: inline-flex;
+  gap: 6px;
+  max-width: min(560px, 100%);
+  overflow-x: auto;
+}
+.rag-sources-title {
+  flex: 0 0 auto;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rag-sources-status {
   padding: 3px 8px;

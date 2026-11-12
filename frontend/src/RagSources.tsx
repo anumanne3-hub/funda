@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
+import type { ChangeEvent, FormEvent, RefObject } from "react";
 import {
   createProjectSource,
   deleteRagDocument,
@@ -16,9 +16,11 @@ import type { IngestionJob, RagDocument } from "./api/client";
 export function RagSources({
   projectId,
   conversationId,
+  uploadInputRef,
 }: {
   projectId: string | null;
   conversationId: string;
+  uploadInputRef: RefObject<HTMLInputElement | null>;
 }) {
   const [sources, setSources] = useState<RagDocument[]>([]);
   const [uploads, setUploads] = useState<RagDocument[]>([]);
@@ -191,9 +193,21 @@ export function RagSources({
     .filter((status) => counts[status] > 0)
     .map((status) => `${counts[status]} ${status}`)
     .join(" · ");
+  const syncedTitles = [...sources, ...uploads]
+    .filter((source) => jobs[source.id]?.status === "completed")
+    .map((source) => source.title);
 
   return (
     <section className="rag-sources" aria-label="Documents and sources">
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept=".txt,.md,.markdown,.html,text/plain,text/markdown,text/html"
+        aria-label="Choose a file to upload to this chat"
+        hidden
+        disabled={busy}
+        onChange={(event) => void upload(event)}
+      />
       <button
         type="button"
         className="rag-sources-open"
@@ -203,6 +217,15 @@ export function RagSources({
         <span className="rag-sources-status" role="status">
           {statusSummary || "No syncs yet"}
         </span>
+        {syncedTitles.length > 0 && (
+          <span className="rag-sources-titles" aria-label="Synced sources">
+            {syncedTitles.map((sourceTitle, index) => (
+              <span className="rag-sources-title" key={`${sourceTitle}-${index}`}>
+                {sourceTitle}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
       <dialog
         ref={dialogRef}
@@ -216,15 +239,6 @@ export function RagSources({
           </button>
         </div>
         {error && <p role="alert">{error}</p>}
-        <label className="rag-upload">
-          Upload to this chat (.txt, .md, .html)
-          <input
-            type="file"
-            accept=".txt,.md,.markdown,.html,text/plain,text/markdown,text/html"
-            disabled={busy}
-            onChange={(event) => void upload(event)}
-          />
-        </label>
         {uploads.length > 0 && (
           <ul>
             {uploads.map((upload) => (

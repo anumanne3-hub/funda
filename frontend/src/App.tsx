@@ -83,6 +83,7 @@ export function App() {
   const [canRetry, setCanRetry] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const pendingRef = useRef<Pending | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
@@ -980,6 +981,7 @@ export function App() {
             key={activeId}
             projectId={active?.project_id ?? null}
             conversationId={activeId}
+            uploadInputRef={uploadInputRef}
           />
         )}
         <div className="messages" aria-live="polite">
@@ -1103,6 +1105,25 @@ export function App() {
             Message
           </label>
           <div className="composer-box">
+            {account && activeId && (
+              <button
+                type="button"
+                className="composer-upload"
+                aria-label="Upload to this chat"
+                title="Upload .txt, .md, or .html to this chat"
+                onClick={() => uploadInputRef.current?.click()}
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M8 12.5 14.5 6a3 3 0 0 1 4.25 4.25l-8.5 8.5a5 5 0 0 1-7.07-7.07l8.5-8.5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
             <textarea
               id="chat-message"
               value={draft}
