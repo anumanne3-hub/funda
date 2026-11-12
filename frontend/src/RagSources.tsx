@@ -220,7 +220,10 @@ export function RagSources({
         {syncedTitles.length > 0 && (
           <span className="rag-sources-titles" aria-label="Synced sources">
             {syncedTitles.map((sourceTitle, index) => (
-              <span className="rag-sources-title" key={`${sourceTitle}-${index}`}>
+              <span
+                className="rag-sources-title"
+                key={`${sourceTitle}-${index}`}
+              >
                 {sourceTitle}
               </span>
             ))}

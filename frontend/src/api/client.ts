@@ -140,12 +140,17 @@ export async function uploadConversationFile(
   file: File,
   key: string,
 ): Promise<IngestionJob> {
+  const extension = file.name.toLowerCase().split(".").pop();
+  const mediaType =
+    extension === "html"
+      ? "text/html"
+      : extension === "md" || extension === "markdown"
+        ? "text/markdown"
+        : "text/plain";
   return request(`/conversations/${conversationId}/uploads`, {
     method: "POST",
     headers: {
-      "Content-Type":
-        file.type ||
-        (file.name.endsWith(".md") ? "text/markdown" : "text/plain"),
+      "Content-Type": mediaType,
       "X-Filename": file.name,
       "Idempotency-Key": key,
     },
