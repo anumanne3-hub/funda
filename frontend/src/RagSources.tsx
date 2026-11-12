@@ -17,10 +17,12 @@ export function RagSources({
   projectId,
   conversationId,
   uploadInputRef,
+  onUploadActivity,
 }: {
   projectId: string | null;
   conversationId: string;
   uploadInputRef: RefObject<HTMLInputElement | null>;
+  onUploadActivity: (active: boolean) => void;
 }) {
   const [sources, setSources] = useState<RagDocument[]>([]);
   const [uploads, setUploads] = useState<RagDocument[]>([]);
@@ -28,8 +30,30 @@ export function RagSources({
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [toast, setToast] = useState<{
+    kind: "inprogress" | "failed" | "completed";
+    message: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const trackedUploads = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    if (!toast || toast.kind === "inprogress") return;
+    const timer = window.setTimeout(() => setToast(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    const pendingUpload = uploads.some((upload) => {
+      const status = jobs[upload.id]?.status;
+      return status === "queued" || status === "running";
+    });
+    onUploadActivity(uploading || pendingUpload);
+  }, [uploading, uploads, jobs, onUploadActivity]);
+
+  useEffect(() => () => onUploadActivity(false), [onUploadActivity]);
 
   useEffect(() => {
     let active = true;
@@ -74,6 +98,20 @@ export function RagSources({
               ...current,
               [updated.document_id]: updated,
             }));
+            const filename = trackedUploads.current.get(updated.id);
+            if (
+              filename &&
+              (updated.status === "completed" || updated.status === "failed")
+            ) {
+              trackedUploads.current.delete(updated.id);
+              setToast({
+                kind: updated.status,
+                message:
+                  updated.status === "completed"
+                    ? `${filename} is ready to use in this chat.`
+                    : `${filename} could not be indexed${updated.error_code ? ` (${updated.error_code})` : ""}.`,
+              });
+            }
           } catch {
             // Keep the last visible state; the next user action can retry the read.
           }
@@ -153,30 +191,56 @@ export function RagSources({
     event.target.value = "";
     if (!file) return;
     setBusy(true);
+    setUploading(true);
+    setToast({ kind: "inprogress", message: `Uploading ${file.name}…` });
     setError(null);
     const keyName = `rag-upload:${conversationId}:${file.name}:${file.size}:${file.lastModified}`;
     const key = sessionStorage.getItem(keyName) ?? crypto.randomUUID();
     sessionStorage.setItem(keyName, key);
     try {
       const job = await uploadConversationFile(conversationId, file, key);
+      if (job.status === "completed" || job.status === "failed") {
+        setToast({
+          kind: job.status,
+          message:
+            job.status === "completed"
+              ? `${file.name} is ready to use in this chat.`
+              : `${file.name} could not be indexed${job.error_code ? ` (${job.error_code})` : ""}.`,
+        });
+      } else {
+        trackedUploads.current.set(job.id, file.name);
+        setToast({
+          kind: "inprogress",
+          message: `${file.name} is being indexed…`,
+        });
+      }
       setJobs((current) => ({ ...current, [job.document_id]: job }));
-      setUploads((current) => [
-        {
-          id: job.document_id,
-          project_id: null,
-          conversation_id: conversationId,
-          source_kind: "upload",
-          source_key: job.document_id,
-          title: file.name,
-          created_at: job.created_at,
-        },
-        ...current,
-      ]);
+      setUploads((current) =>
+        current.some((item) => item.id === job.document_id)
+          ? current
+          : [
+              {
+                id: job.document_id,
+                project_id: null,
+                conversation_id: conversationId,
+                source_kind: "upload",
+                source_key: job.document_id,
+                title: file.name,
+                created_at: job.created_at,
+              },
+              ...current,
+            ],
+      );
       sessionStorage.removeItem(keyName);
     } catch (failure) {
       setError(String(failure));
+      setToast({
+        kind: "failed",
+        message: `${file.name} upload failed: ${String(failure)}`,
+      });
     } finally {
       setBusy(false);
+      setUploading(false);
     }
   }
 
@@ -322,6 +386,21 @@ export function RagSources({
           </>
         )}
       </dialog>
+      {toast && (
+        <div
+          className={`upload-toast ${toast.kind}`}
+          role={toast.kind === "failed" ? "alert" : "status"}
+        >
+          <strong>
+            {toast.kind === "inprogress"
+              ? "In progress"
+              : toast.kind === "failed"
+                ? "Failed"
+                : "Completed"}
+          </strong>
+          <span>{toast.message}</span>
+        </div>
+      )}
     </section>
   );
 }

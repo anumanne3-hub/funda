@@ -76,6 +76,7 @@ export function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [uploadActive, setUploadActive] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [pageError, setPageError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -598,7 +599,12 @@ export function App() {
     try {
       socketRef.current?.close();
       setConnection("connecting");
-      const conversation = await createConversation(selectedProject || null);
+      const currentProject = conversations.find(
+        (item) => item.id === activeId,
+      )?.project_id;
+      const conversation = await createConversation(
+        selectedProject || currentProject || null,
+      );
       setConversations((items) => [conversation, ...items]);
       setActiveId(conversation.id);
     } catch (error) {
@@ -982,6 +988,7 @@ export function App() {
             projectId={active?.project_id ?? null}
             conversationId={activeId}
             uploadInputRef={uploadInputRef}
+            onUploadActivity={setUploadActive}
           />
         )}
         <div className="messages" aria-live="polite">
@@ -1108,8 +1115,13 @@ export function App() {
             {account && activeId && (
               <button
                 type="button"
-                className="composer-upload"
-                aria-label="Upload to this chat"
+                className={`composer-upload${uploadActive ? " is-active" : ""}`}
+                aria-label={
+                  uploadActive
+                    ? "Document upload in progress"
+                    : "Upload to this chat"
+                }
+                aria-busy={uploadActive}
                 title="Upload .txt, .md, or .html to this chat"
                 onClick={() => uploadInputRef.current?.click()}
               >
