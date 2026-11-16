@@ -1122,7 +1122,7 @@ export function App() {
                     : "Upload to this chat"
                 }
                 aria-busy={uploadActive}
-                title="Upload .txt, .md, or .html to this chat"
+                title="Upload a document or image to this chat"
                 onClick={() => uploadInputRef.current?.click()}
               >
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">

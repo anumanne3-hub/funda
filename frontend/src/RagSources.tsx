@@ -4,7 +4,6 @@ import {
   createProjectSource,
   deleteRagDocument,
   getIngestionJob,
-  getRagCapabilities,
   listAllowedSourceUrls,
   listConversationIngestionJobs,
   listConversationUploads,
@@ -41,7 +40,6 @@ export function RagSources({
   const [showAllowedUrls, setShowAllowedUrls] = useState(false);
   const [allowedUrls, setAllowedUrls] = useState<string[] | null>(null);
   const [allowedUrlsError, setAllowedUrlsError] = useState(false);
-  const [imageUploadEnabled, setImageUploadEnabled] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const trackedUploads = useRef(new Map<string, string>());
 
@@ -60,20 +58,6 @@ export function RagSources({
   }, [uploading, uploads, jobs, onUploadActivity]);
 
   useEffect(() => () => onUploadActivity(false), [onUploadActivity]);
-
-  useEffect(() => {
-    let active = true;
-    void getRagCapabilities()
-      .then((capabilities) => {
-        if (active) setImageUploadEnabled(capabilities.image_upload_enabled);
-      })
-      .catch(() => {
-        if (active) setImageUploadEnabled(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -302,7 +286,7 @@ export function RagSources({
       <input
         ref={uploadInputRef}
         type="file"
-        accept={`.txt,.md,.markdown,.html,.pdf,text/plain,text/markdown,text/html,application/pdf${imageUploadEnabled ? ",.png,.jpg,.jpeg,image/png,image/jpeg" : ""}`}
+        accept=".txt,.md,.markdown,.html,.pdf,.png,.jpg,.jpeg,text/plain,text/markdown,text/html,application/pdf,image/png,image/jpeg"
         aria-label="Choose a file to upload to this chat"
         hidden
         disabled={busy}
