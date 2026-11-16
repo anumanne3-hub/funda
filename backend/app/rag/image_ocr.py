@@ -13,14 +13,13 @@ class ImageOcrError(Exception):
     pass
 
 
-def extract_image_text(content: bytes, media_type: str) -> list[ExtractedText]:
-    try:
-        validate_image(content, media_type)
-    except ImageValidationError as exc:
-        raise ImageOcrError("Invalid image") from exc
+def _run_ocr(content: bytes, *, sparse: bool = False) -> str:
+    command = ["tesseract", "stdin", "stdout", "-l", "eng"]
+    if sparse:
+        command.extend(["--psm", "11"])
     try:
         result = subprocess.run(
-            ["tesseract", "stdin", "stdout", "-l", "eng"],
+            command,
             input=content,
             capture_output=True,
             timeout=OCR_TIMEOUT_SECONDS,
@@ -36,4 +35,15 @@ def extract_image_text(content: bytes, media_type: str) -> list[ExtractedText]:
         raise ImageOcrError("OCR returned invalid text") from exc
     if len(text) > MAX_OCR_CHARS:
         raise ImageOcrError("OCR text exceeds limit")
+    return text
+
+
+def extract_image_text(content: bytes, media_type: str) -> list[ExtractedText]:
+    try:
+        validate_image(content, media_type)
+    except ImageValidationError as exc:
+        raise ImageOcrError("Invalid image") from exc
+    text = _run_ocr(content)
+    if not text.strip():
+        text = _run_ocr(content, sparse=True)
     return [ExtractedText(text, SourceLocation(section="Image"))] if text.strip() else []

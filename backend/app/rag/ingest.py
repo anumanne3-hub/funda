@@ -121,6 +121,8 @@ class TextIngestionProcessor:
                 )
             except (StorageError, ExtractionError, ImageOcrError) as exc:
                 raise ProcessingError("UPLOAD_PREPARATION_FAILED", retryable=True) from exc
+            if upload_type in {"image/png", "image/jpeg"} and not segments:
+                raise ProcessingError("IMAGE_TEXT_NOT_FOUND")
             chunks = [chunk for segment in segments for chunk in chunk_text(segment)]
             if not chunks or len(chunks) > MAX_CHUNKS:
                 raise ProcessingError("UPLOAD_CHUNKS_INVALID")

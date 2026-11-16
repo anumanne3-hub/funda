@@ -32,3 +32,18 @@ def test_image_ocr_fails_closed_on_timeout(monkeypatch):
     monkeypatch.setattr(image_ocr.subprocess, "run", timeout)
     with pytest.raises(ImageOcrError):
         extract_image_text(png(), "image/png")
+
+
+def test_image_ocr_retries_sparse_text_when_default_finds_nothing(monkeypatch):
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(command)
+        output = b"Visible words\n" if "--psm" in command else b""
+        return CompletedProcess(command, 0, output, b"")
+
+    monkeypatch.setattr(image_ocr.subprocess, "run", run)
+    segments = extract_image_text(png(), "image/png")
+    assert segments[0].text == "Visible words\n"
+    assert len(commands) == 2
+    assert commands[1][-2:] == ["--psm", "11"]
