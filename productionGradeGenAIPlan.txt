@@ -21,12 +21,17 @@ RELEASES
 - v0.1.0: isolated anonymous chatbot with durable persistence.
 - v0.2.0: authentication, projects, and conversation controls.
 - v0.3.0: document RAG with citations.
+- v0.3.1: additional RAG sources (image, audio, cloud folder or bucket).
 - v0.4.0: bounded short-term conversation context.
 - v0.5.0: long-term user/project memory.
 - v0.6.0: bounded orchestration and answer analysis.
 - v0.7.0: caching, durable jobs, and performance.
 - v1.0.0: hardened and observable portfolio release.
 - v1.1.0: containers and Kubernetes migration.
+
+Milestone 3.1 is sequenced between Milestones 3 and 4. The week labels for later
+milestones are original estimates and shift by the time spent on 3.1; their
+scope and release order remain unchanged.
 
 ENGINEERING RULES
 
@@ -167,6 +172,25 @@ Gate
 - Cross-user/project retrieval is impossible and deletion removes future retrieval.
 - Worker restart safely resumes abandoned jobs.
 
+MILESTONE 3.1 — ADDITIONAL RAG SOURCES
+Target: after the Milestone 3 release gate and before Milestone 4; size each source adapter separately.
+Release: v0.3.1
+
+Goal: extend the existing owner-scoped ingestion, retrieval, and citation pipeline to more source types.
+
+Tasks
+- Add image ingestion with bounded file validation, OCR or vision extraction, and image/location provenance.
+- Add audio ingestion with bounded duration and size, transcription, timestamps, and timestamped citations.
+- Add a cloud-accessible folder or bucket adapter with owner authorization, incremental listings, stable source identities, and safe handling of incomplete scans. A local laptop folder requires a separate local uploader.
+- Record extractor and provider versions, enforce per-type limits and costs, and keep originals private.
+- Reuse the Milestone 3 job, deletion, scope, and citation rules for every new source type.
+- Add fixed extraction and retrieval cases plus hosted acceptance for each adapter before enabling it.
+
+Gate
+- Each enabled source type ingests, retrieves, cites its original location, and survives reload.
+- Malformed, oversized, inaccessible, and deleted sources fail safely without cross-user or cross-project exposure.
+- Worker retries and deletion remove private originals and derived data for every enabled type.
+
 MILESTONE 4 — SHORT-TERM CONTEXT
 Target: Week 4, 18–24 hours
 Release: v0.4.0
@@ -247,6 +271,8 @@ Tasks
 - Cache full responses only when every answer-changing input is represented in the key.
 - Invalidate on message/branch, document, memory, prompt/model, corpus, and authorization changes.
 - Add bypass, hit/miss/eviction/latency metrics, worker backlog metrics, and outage fallback.
+- Paginate project sources, conversation uploads, and ingestion jobs beyond the current 100-record list cap; preserve stable ordering and authorization across pages.
+- Add scheduled website refresh with an explicit interval, allowlist checks on each fetch, change detection, and no re-embedding of unchanged pages.
 - Load-test a representative workload and inspect database pool/provider limits.
 
 Gate
@@ -255,6 +281,8 @@ Gate
 - Every relevant mutation prevents stale reuse.
 - Cache outage preserves functional correctness.
 - Worker retries remain idempotent.
+- Large source and job histories remain navigable without missing or duplicated records.
+- Scheduled refresh publishes changed pages safely and leaves the prior ready version available when a refresh fails.
 
 MILESTONE 8 — HARDENING AND PORTFOLIO RELEASE
 Target: 24–32 hours

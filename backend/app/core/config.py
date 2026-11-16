@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     rag_embedding_dimensions: Literal[2048] = 2048
     rag_embedding_api_key: str | None = None
     rag_chat_enabled: bool = False
+    rag_image_upload_enabled: bool = False
 
     @model_validator(mode="before")
     @classmethod

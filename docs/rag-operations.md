@@ -3,9 +3,15 @@
 The Render blueprint currently sets `RAG_CHAT_ENABLED=true`. Text, Markdown, HTML,
 PDF uploads, and allowlisted single-page websites are implemented; image, audio,
 and cloud-folder ingestion are not yet available. A NASA Earth website sync and cited
-answer have worked on the hosted app, but the full acceptance checklist below
-has not been recorded. An earlier conversation upload returned HTTP 503 and
-still requires a successful hosted retest. Treat this as an open release gate.
+answer have worked on the hosted app. On 2026-11-16 the user confirmed that PDF
+upload and RAG answers work there, superseding an earlier upload failure. The
+full acceptance checklist below has not been recorded; the release gate remains open.
+
+Verification on 2026-11-16: the deployed frontend, `/health`, and `/ready`
+returned HTTP 200. The public smoke script passed with a real model response,
+retry, and anonymous-session isolation. Local checks passed: 93 backend tests,
+4 PostgreSQL-only skips, Ruff format/lint, mypy, frontend build/lint/format.
+These checks do not replace the authenticated RAG acceptance below.
 
 ## Deploy in order
 
@@ -14,7 +20,10 @@ still requires a successful hosted retest. Treat this as an open release gate.
    extension, the 2048-dimensional `document_chunks.embedding` column, and the
    `storage_deletions` table. Do not reset an existing database.
 2. Create a private Supabase Storage bucket matching `RAG_STORAGE_BUCKET` (default
-   `rag-private`). The bucket must not allow public object reads.
+   `rag-private`). The bucket must not allow public object reads. Originals use
+   object keys shaped as `{user_id}/{document_id}/{version_id}` inside that
+   bucket; database `document_versions.storage_key` stores the key, not a public
+   URL. The API and worker read through authenticated Storage requests.
 3. Set these Render backend variables privately: `RAG_STORAGE_URL`,
    `RAG_STORAGE_SERVICE_KEY`, `RAG_STORAGE_BUCKET`, `RAG_ALLOWED_SOURCE_URLS`,
    `RAG_DISPATCH_REPOSITORY`, `RAG_DISPATCH_REF`, and `RAG_DISPATCH_TOKEN`.
@@ -34,6 +43,9 @@ The `rag-ingest.yml` workflow handles individual dispatches and reconciles up to
 or expired jobs at 00:00, 05:00, 10:00, 15:00 and 20:00 UTC. Its scheduled cleanup handles
 at most 20 soft-deleted documents and 100 queued object deletions per run. GitHub schedules are not a latency
 guarantee. An object deletion failure leaves its key in `storage_deletions` for retry.
+Soft-deleting a source excludes it from retrieval immediately; scheduled cleanup
+removes derived rows and retries private object deletion. Never place the storage
+service key in a `VITE_` frontend variable or in a public bucket policy.
 
 ## Local and CI verification
 

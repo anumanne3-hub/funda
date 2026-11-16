@@ -17,6 +17,7 @@ from app.models import Document, DocumentChunk, DocumentVersion, IngestionJob
 from app.rag.chunking import chunk_text
 from app.rag.contracts import EmbeddingProvider
 from app.rag.extract_text import ExtractionError, extract_text
+from app.rag.image_ocr import ImageOcrError, extract_image_text
 from app.rag.prepare import MAX_CHUNKS, PreparationError, PreparedSource, prepare_website
 from app.rag.storage import StorageError, object_key
 from app.rag.web_sources import fetch_website
@@ -113,8 +114,12 @@ class TextIngestionProcessor:
                 original = await to_thread(self.storage.get, upload_path)
                 if hashlib.sha256(original).hexdigest() != upload_hash:
                     raise ProcessingError("UPLOAD_HASH_MISMATCH")
-                segments = extract_text(original, upload_type)
-            except (StorageError, ExtractionError) as exc:
+                segments = (
+                    await to_thread(extract_image_text, original, upload_type)
+                    if upload_type in {"image/png", "image/jpeg"}
+                    else extract_text(original, upload_type)
+                )
+            except (StorageError, ExtractionError, ImageOcrError) as exc:
                 raise ProcessingError("UPLOAD_PREPARATION_FAILED", retryable=True) from exc
             chunks = [chunk for segment in segments for chunk in chunk_text(segment)]
             if not chunks or len(chunks) > MAX_CHUNKS:

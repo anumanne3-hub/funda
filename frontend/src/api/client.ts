@@ -103,6 +103,11 @@ export async function listProjectSources(
 export async function listAllowedSourceUrls(): Promise<string[]> {
   return request("/rag/allowed-source-urls");
 }
+export async function getRagCapabilities(): Promise<{
+  image_upload_enabled: boolean;
+}> {
+  return request("/rag/capabilities");
+}
 export async function listConversationUploads(
   conversationId: string,
 ): Promise<RagDocument[]> {
@@ -152,11 +157,15 @@ export async function uploadConversationFile(
   const mediaType =
     extension === "pdf"
       ? "application/pdf"
-      : extension === "html"
-      ? "text/html"
-      : extension === "md" || extension === "markdown"
-        ? "text/markdown"
-        : "text/plain";
+      : extension === "png"
+        ? "image/png"
+        : extension === "jpg" || extension === "jpeg"
+          ? "image/jpeg"
+          : extension === "html"
+            ? "text/html"
+            : extension === "md" || extension === "markdown"
+              ? "text/markdown"
+              : "text/plain";
   return request(`/conversations/${conversationId}/uploads`, {
     method: "POST",
     headers: {

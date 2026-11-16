@@ -341,15 +341,16 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                 Retrieval augmented generation (RAG) finds relevant source
                 material and uses it to answer with citations. Signed-in users
                 can sync allowlisted website pages for a project and upload
-                text, Markdown, HTML, or PDF files to one chat. A completed job
-                makes its source available for grounded answers.
+                text, Markdown, HTML, PDF, or PNG/JPEG image files to one chat.
+                A completed job makes its source available for grounded answers.
               </p>
               <p>
-                Project websites are available in every conversation assigned
-                to that project. A document uploaded with the paperclip is
+                Project websites are available in every conversation assigned to
+                that project. A document uploaded with the paperclip is
                 available only in that conversation. New chats inherit the
                 current chat&apos;s project unless a project filter is selected.
-                Existing chats must be assigned to the project to use its sources.
+                Existing chats must be assigned to the project to use its
+                sources.
               </p>
               <section className="help-card">
                 <h2>Ingestion: prepare source material</h2>
@@ -365,9 +366,7 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                   </span>
                   <div>
                     <strong>Trigger</strong>
-                    <span>
-                      Sync button or chat upload
-                    </span>
+                    <span>Sync button or chat upload</span>
                   </div>
                   <span className="rag-arrow" aria-hidden="true">
                     →
@@ -404,16 +403,52 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                 <p>
                   Jobs can be queued, running, completed, or failed. The
                   paperclip shows activity and upload toasts report progress.
-                  Image, audio, and cloud folder ingestion are not yet available.
-                  PDF uploads preserve page numbers for citations.
+                  Image uploads use OCR to read visible text when enabled. Audio
+                  and cloud folder ingestion are not yet available. PDF uploads
+                  preserve page numbers for citations; text inside a scanned PDF
+                  image is not extracted yet.
+                </p>
+              </section>
+              <section className="help-card rag-section">
+                <h2>Where documents are stored</h2>
+                <p>
+                  Original uploaded files and fetched website pages go into a
+                  private Supabase Storage bucket. The bucket is selected by the
+                  backend&apos;s <code>RAG_STORAGE_BUCKET</code> setting; its
+                  default name is <code>rag-private</code>. Files are organized
+                  under owner, document, and version IDs. They have no public
+                  download URL.
+                </p>
+                <p>
+                  Supabase PostgreSQL stores the document records, ingestion
+                  jobs, text chunks, source locations, and pgvector embeddings.
+                  The Render API and GitHub Actions worker use private storage
+                  credentials; the browser never receives those credentials.
+                  Deleting a source excludes it from search immediately and
+                  queues its private file for cleanup.
+                </p>
+              </section>
+              <section className="help-card rag-section">
+                <h2>Chunking and source metadata</h2>
+                <p>
+                  Extracted text is split into chunks of up to 1,200 characters,
+                  with 150 characters of overlap. The splitter prefers a word
+                  boundary and keeps each chunk within its source segment, such
+                  as a PDF page or website section. This is character-based
+                  chunking, not token-based or semantic chunking.
+                </p>
+                <p>
+                  Each chunk keeps its order and character offsets, plus a PDF
+                  page number or section heading when available. Its document
+                  records the title, source type, owner, and project or chat;
+                  each indexed version records its content hash, media type,
+                  status, and embedding model. These details restrict search to
+                  accessible sources and let citations point back to them.
                 </p>
               </section>
               <section className="help-card rag-section">
                 <h2>Retrieval: answer a question</h2>
-                <div
-                  className="rag-flow"
-                  aria-label="Question answering flow"
-                >
+                <div className="rag-flow" aria-label="Question answering flow">
                   <div>
                     <strong>Chat question</strong>
                     <span>Embed the user's question</span>
@@ -443,8 +478,15 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                 <p>
                   Project sources are scoped to their project; chat uploads are
                   scoped to their conversation. If evidence is insufficient, the
-                  answer says so. Citations are saved with the answer and
-                  remain visible after reload.
+                  answer says so. Citations are saved with the answer and remain
+                  visible after reload.
+                </p>
+                <p>
+                  Retrieval top K is 5: the five closest matching chunks are
+                  sent to the language model. The app does not explicitly set
+                  generation temperature or a model top K value, so those use
+                  the selected provider&apos;s defaults. Retrieval top K and
+                  model top K are separate settings.
                 </p>
               </section>
               <section className="help-card rag-section">
@@ -453,8 +495,9 @@ export function HelpPage({ onClose }: { onClose: () => void }) {
                   Jobs use durable attempts and leases for retries and recovery.
                   GitHub Actions may delay a run, so the UI shows its status.
                   The backend holds workflow and private storage credentials.
-                  Full hosted acceptance, including PDF uploads, is still
-                  pending.
+                  PDF upload and RAG answers have been confirmed in the hosted
+                  app. The full hosted security, deletion, and recovery checks
+                  remain open.
                 </p>
               </section>
             </>

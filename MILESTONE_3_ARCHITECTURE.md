@@ -1,6 +1,6 @@
 # Milestone 3: Document RAG architecture
 
-## Current status (2026-11-12)
+## Current status (2026-11-16)
 
 The signed-in RAG path is implemented for allowlisted single-page websites and
 conversation uploads of UTF-8 text, Markdown, HTML, and PDF. Project websites are
@@ -11,17 +11,26 @@ saves citations with answers. The Render blueprint currently sets
 `RAG_CHAT_ENABLED=true`.
 
 A NASA Earth website sync completed in the hosted app and produced cited
-answers. An earlier conversation upload returned HTTP 503, so hosted upload
-acceptance remains open. The app displays upload activity and completion or
-failure toasts; those indicators do not establish that hosted storage works.
+answers. On 2026-11-16 the user confirmed that PDF upload and RAG answers work
+in the hosted app, superseding the earlier upload failure. The app displays
+upload activity and completion or failure toasts.
 New chats inherit the active chat's project when no project filter is selected.
+
+On 2026-11-16, read-only checks of the deployed frontend, API `/health`, and
+API `/ready` returned HTTP 200. The repository's public smoke script passed
+with a real provider, including streaming, idempotent retry, and anonymous
+session isolation. Local verification passed with 93 backend tests and 4
+PostgreSQL-only skips; Ruff, mypy, frontend build, lint, and formatting passed.
+The frontend formatting check initially found two files, which were formatted
+before the successful rerun. No disposable `TEST_DATABASE_URL`, local PostgreSQL,
+or Docker command is configured in this workspace.
 
 ### Remaining work
 
-1. Verify PDF upload and page citations on the hosted stack. Local PDF extraction
-   now rejects malformed, encrypted, oversized, and excessive-page PDFs.
-   Image, audio, and cloud-folder adapters are unavailable and require separate
-   provider/source choices.
+1. Verify PDF page citations and citation persistence after reload on the hosted
+   stack. Local PDF extraction rejects malformed, encrypted, oversized, and
+   excessive-page PDFs.
+   Image, audio, and cloud-folder adapters are planned for Milestone 3.1.
 2. Complete the hosted acceptance matrix in `docs/rag-operations.md`: text,
    Markdown, and HTML uploads; citation persistence and insufficient evidence;
    cross-account and cross-project isolation; deletion and private object cleanup;
@@ -30,12 +39,20 @@ New chats inherit the active chat's project when no project filter is selected.
 3. Run disposable PostgreSQL/pgvector tests without skips, backend quality
    checks, and frontend build/lint/format checks. Confirm provider quotas and
    outstanding Milestone 2 release gates.
-4. Add pagination beyond the current 100-record source/job list cap and collect
-   hosted retrieval/citation quality evaluations.
+4. Collect hosted retrieval/citation quality evaluations. Pagination beyond the
+   current 100-record source/job list cap and automatic website refresh are
+   planned for Milestone 7.
 
 The PDF parser dependency was installed and locked after granting network access
 outside the sandbox. Hosted acceptance still requires access to the configured
 deployment. The release gate remains open.
+
+### Latest local test record (2026-11-16)
+
+The backend virtual environment ran `python -m pytest -q`: **93 passed, 4
+skipped**. The skips require a disposable PostgreSQL/pgvector `TEST_DATABASE_URL`.
+The suite reported one upstream Starlette/httpx deprecation warning. This is a
+local result; it does not close the hosted acceptance items above.
 
 ## Purpose
 

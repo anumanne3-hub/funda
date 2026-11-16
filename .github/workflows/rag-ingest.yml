@@ -34,6 +34,7 @@ jobs:
         with:
           python-version: '3.13'
       - run: pip install uv==0.13.6
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
       - run: uv sync --locked
       - if: github.event_name == 'workflow_dispatch'
         run: uv run --locked python -m app.rag.run_worker "$RAG_JOB_ID"

@@ -60,7 +60,14 @@ class PrivateStorage:
     def put(self, key: str, content: bytes, media_type: str) -> None:
         if len(content) > MAX_OBJECT_BYTES:
             raise StorageError("Object exceeds size limit")
-        if media_type not in {"text/plain", "text/markdown", "text/html", "application/pdf"}:
+        if media_type not in {
+            "text/plain",
+            "text/markdown",
+            "text/html",
+            "application/pdf",
+            "image/png",
+            "image/jpeg",
+        }:
             raise StorageError("Unsupported object type")
         try:
             response = self.client.post(

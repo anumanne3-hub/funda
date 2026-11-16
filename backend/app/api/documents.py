@@ -17,6 +17,7 @@ from app.db.session import get_db
 from app.models import Conversation, Document, DocumentVersion, IngestionJob, Project
 from app.rag.dispatch import dispatch_job
 from app.rag.extract_text import ExtractionError, extract_text
+from app.rag.image_validation import ImageValidationError, validate_image
 from app.rag.storage import MAX_OBJECT_BYTES, PrivateStorage, StorageError, object_key
 
 router = APIRouter()
@@ -48,6 +49,10 @@ class JobRead(BaseModel):
     error_code: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class RagCapabilities(BaseModel):
+    image_upload_enabled: bool
 
 
 def owned_project(db: Session, project_id: UUID, user_id: UUID) -> Project:
@@ -93,6 +98,12 @@ def allowed_source_urls(request: Request, db: Session = Depends(get_db)) -> list
     ]
 
 
+@router.get("/rag/capabilities", response_model=RagCapabilities)
+def rag_capabilities(request: Request, db: Session = Depends(get_db)) -> RagCapabilities:
+    account_identity(request, db)
+    return RagCapabilities(image_upload_enabled=get_settings().rag_image_upload_enabled)
+
+
 @router.post("/conversations/{conversation_id}/uploads", response_model=JobRead, status_code=202)
 async def upload_to_conversation(
     conversation_id: UUID, request: Request, db: Session = Depends(get_db)
@@ -112,7 +123,13 @@ async def upload_to_conversation(
     if not title or len(title) > 500 or any(c in title for c in "/\\\r\n\x00"):
         raise HTTPException(status_code=422, detail="A valid X-Filename is required")
     media_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
-    if media_type not in {"text/plain", "text/markdown", "text/html", "application/pdf"}:
+    image_type = media_type in {"image/png", "image/jpeg"}
+    if image_type and not get_settings().rag_image_upload_enabled:
+        raise HTTPException(status_code=415, detail="Image uploads are not enabled")
+    if (
+        media_type not in {"text/plain", "text/markdown", "text/html", "application/pdf"}
+        and not image_type
+    ):
         raise HTTPException(status_code=415, detail="Unsupported upload type")
     body = bytearray()
     async for chunk in request.stream():
@@ -122,10 +139,13 @@ async def upload_to_conversation(
     if not body:
         raise HTTPException(status_code=422, detail="Upload is empty")
     try:
-        segments = extract_text(bytes(body), media_type)
-        if not any(segment.text.strip() for segment in segments):
-            raise ExtractionError("Source has no extractable text")
-    except ExtractionError:
+        if image_type:
+            validate_image(bytes(body), media_type)
+        else:
+            segments = extract_text(bytes(body), media_type)
+            if not any(segment.text.strip() for segment in segments):
+                raise ExtractionError("Source has no extractable text")
+    except (ExtractionError, ImageValidationError):
         raise HTTPException(status_code=422, detail="Upload could not be extracted") from None
     content_hash = hashlib.sha256(body).hexdigest()
     prior = db.scalar(

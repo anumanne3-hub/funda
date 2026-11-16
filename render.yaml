@@ -39,3 +39,5 @@ services:
         value: '1'
       - key: RAG_CHAT_ENABLED
         value: 'true'
+      - key: RAG_IMAGE_UPLOAD_ENABLED
+        value: 'true'

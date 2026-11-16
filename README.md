@@ -161,5 +161,6 @@ remains gated on real-provider, hosted CI and public deployment verification.
 
 Milestone 3 RAG deployment and hosted acceptance steps are in
 [the RAG operations guide](docs/rag-operations.md). The Render blueprint currently
-sets `RAG_CHAT_ENABLED=true`; hosted upload and isolation acceptance are still open.
+sets `RAG_CHAT_ENABLED=true`; PDF upload and RAG answers have worked in the hosted
+app, while isolation and cleanup acceptance remain open.
 Use the guide's rollback procedure if ingestion or retrieval fails.
